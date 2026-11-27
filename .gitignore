@@ -3,3 +3,4 @@
 !.env.example
 .kartaview_login_state
 photos/cache/
+three/cache/

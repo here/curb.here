@@ -6,7 +6,7 @@ OSM is open map data (ODbL 1.0). Overpass is a read-only query API for OSM data.
 | Priority | Endpoint | Status from roady, 2026-11-27 |
 |---|---|---|
 | 1. Primary | `https://api.overpass.ch/v1/$OVERPASS_CH_API_KEY/interpreter` | **Works, and fast.** A 100 m amenity query took 0.9 s on 2026-11-27 (overpass-api.de took ~37 s for the same query). The key is in `.env` (`OVERPASS_CH_API_KEY`). |
-| 2. Fallback | `https://overpass.nextgis.com/$NEXTGIS_OVERPASS_KEY/api/interpreter` | **Keyed, not yet tested.** The key is in `.env` (`NEXTGIS_OVERPASS_KEY`). The bare host returns 301. The `/api/interpreter` suffix is a guess: if it's wrong, set the full URL in `NEXTGIS_OVERPASS_URL` (in `.env` only). |
+| 2. Fallback | `https://overpass.nextgis.com/$NEXTGIS_OVERPASS_KEY/api/interpreter` | **Works, and fast.** On 2026-11-27 a 100 m amenity query took 1.4 s (Overpass API 0.7.62.9, data minutely current). The key is in `.env` (`NEXTGIS_OVERPASS_KEY`). The path is `/<key>/api/interpreter`; `/<key>/interpreter` returns 404. |
 | 3. Fallback | https://overpass.private.coffee/api/interpreter | **Times out (looks overloaded).** The home page loads, but `/api/interpreter` and `/api/status` hang. |
 | 4. Fallback | https://overpass-api.de/api/interpreter | **Often overloaded.** One query worked in about 37 s; others timed out. Without a `User-Agent` it returns **406 Not Acceptable**. |
 
@@ -62,6 +62,7 @@ Bbox `34.0811,-118.2757,34.0847,-118.2714` (Overpass order), about 200 m around 
   N Reno St, N Vendome St, Reservoir St, Westerly Ter.
 
 ## TODO
+- [x] NextGIS key in `.env` and interpreter tested on roady, 2026-11-27. `scripts/overpass.sh` falls back to it when overpass.ch is unavailable.
 - [x] overpass.ch key in `.env`, interpreter tested, and MCP server `overpass` registered in local scope (connected) on roady, 2026-11-27.
 - [ ] Save focus-area extracts as GeoJSON in `map/data/` (crossings, signals, curbs and sidewalks for "curb.here").
 - [ ] Look into curb-related tags: `kerb=*`, `sidewalk=*`, `parking:lane:*` / `parking:*`, `crossing=*`.
