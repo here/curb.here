@@ -15,5 +15,5 @@ Rough bounding box used for queries (lon/lat, WGS84):
 
 ## Workstreams
 - [photos/](photos/photos.md) — street-level / field photo services (Panoramax, KartaView, Mapillary)
-- maps — TBD (OSM, LA City GeoHub, LA County open data)
+- [map/](map/map-osm.md) — OSM via Overpass ([map-osm.md](map/map-osm.md)); later LA City GeoHub and LA County open data
 - gps — TBD (GPX traces, OSM public traces)
