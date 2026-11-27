@@ -161,6 +161,11 @@ docs/sunset/data/scene.json baked data (committed)
 docs/sunset/data/photos.json  field photo poses; images in docs/sunset/photos/ (scripts/photo_to_scene.py)
 worker/wrangler.toml, worker/src/index.js
 ```
+**Cache-busting:** after changing anything in `docs/sunset/`, run `scripts/stamp_sunset.py` and commit `index.html` along with the change. The two bakers run it automatically.
+- It stamps `main.js?v=<content hash>` into `index.html`. `main.js` passes the same `?v=` on to `scene.json`, `photos.json` and the photo images, so a page load never mixes old and new files.
+- Why it's needed: the curb.here zone sends `Cache-Control: max-age=14400` (Cloudflare's default 4-hour browser cache), overriding GitHub's 10 minutes.
+- `index.html` itself still needs a short cache from the Worker; see Hosting.
+
 To view locally, run `python3 -m http.server -d docs 8000` and open http://localhost:8000/sunset/.
 
 ## Steps

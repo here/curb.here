@@ -357,6 +357,7 @@ def main():
         json.dump(scene, f, separators=(",", ":"))
     c = {k: len(v) for k, v in scene.items() if isinstance(v, list)}
     print(f"wrote {a.out} ({os.path.getsize(a.out)//1024} KB): {c}", file=sys.stderr)
+    import stamp_sunset; stamp_sunset.stamp()   # new ?v= so browsers and the CDN fetch the new files
 
 
 if __name__ == "__main__":

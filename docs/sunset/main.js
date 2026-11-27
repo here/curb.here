@@ -21,6 +21,9 @@ const COLORS = {
 const AREA_COLORS = { park: COLORS.park, garden: COLORS.park, playground: COLORS.park, grass: COLORS.grass,
   swimming_pool: COLORS.pool, water: COLORS.pool, wood: 0x6f9a52, scrub: 0x93a868,
   retail: 0xd2cbbf, commercial: 0xd2cbbf, construction: 0xcdb98f, parking: 0xb9b6b0 };
+// Cache-busting: index.html loads main.js?v=<hash> (scripts/stamp_sunset.py); pass it on to data files.
+const V = new URL(import.meta.url).searchParams.get("v");
+const bust = (u) => V ? `${u}?v=${V}` : u;
 const $ = (id) => document.getElementById(id);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xbcd3e6);
@@ -708,10 +711,10 @@ function updatePhotoInfo(force = false) {
 
 async function setupPhotos() {
   let list = [];
-  try { list = (await (await fetch("./data/photos.json")).json()).photos; } catch { return; }
+  try { list = (await (await fetch(bust("./data/photos.json"))).json()).photos; } catch { return; }
   const loader = new THREE.TextureLoader();
   for (const P of list.slice(0, MAXP)) {
-    P.texture = await loader.loadAsync("./" + P.image);
+    P.texture = await loader.loadAsync(bust("./" + P.image));
     P.texture.colorSpace = THREE.SRGBColorSpace;
     P.texture.anisotropy = 8;
     photoSetup(P);
@@ -759,7 +762,7 @@ addEventListener("resize", () => {
   renderer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
 });
 
-const S = await (await fetch("./data/scene.json")).json();
+const S = await (await fetch(bust("./data/scene.json"))).json();
 build(S);
 await setupPhotos();
 $("loading").remove();

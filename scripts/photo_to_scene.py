@@ -76,6 +76,7 @@ def main():
         }
         print(f"{pid}: {photos[pid]['p']} heading {photos[pid]['heading']}", file=sys.stderr)
     path.write_text(json.dumps({"photos": list(photos.values())}, indent=1))
+    import stamp_sunset; stamp_sunset.stamp()   # new ?v= so browsers and the CDN fetch the new files
 
 
 if __name__ == "__main__":
