@@ -185,6 +185,7 @@ To view locally, run `python3 -m http.server -d docs 8000` and open http://local
 - [ ] Road widths from the gap between the mapped sidewalks, instead of lane counts.
 - [ ] Turn arrows from `turn:lanes:*`.
 - [ ] **TODO: street-view walk mode for touchscreens.** Street view is disabled on touch devices because there's no way to walk. It needs on-screen controls: a virtual joystick or drag-to-walk, plus a jump button.
+- [ ] Consider: flat photos appear to jump when you jump in street view (parallax from the 6 m panels). Options are listed in [plan/plan.md](../plan/plan.md), "For consideration".
 - [ ] Hide far labels. CSS labels show through buildings.
 - [ ] Find out what passes under the Sunset bridge (way 30528196) and fix the bridge model.
 - [ ] Better ground: USGS 3DEP 1 m DTM instead of building `ele`.
