@@ -218,12 +218,20 @@ The toggles are stored in the URL hash: `ph=f`, `ph=m` or `ph=fm`, plus `poff=2`
 - Picked by metadata only (nearest date to photos 1 and 2 among those on Parkman) and **not checked in the viewer**, so its pose and the 1.2 m camera height guess are unverified. Photos 1 and 2 face Sunset.
 - It sits at the edge of the model, so little of its view lands on modelled surfaces.
 
+**Photo 4:** Mapillary [1644797915731122](https://www.mapillary.com/app/?pKey=1644797915731122), by mapkin, 2016-08-04 (iPhone 5s, same drive as photo 2).
+- It was taken about 105 m northwest of the signal, looking north-northwest (heading 336°, pitch +9.3°), away from the intersection.
+
+**Photo 5:** Mapillary [1191635439743321](https://www.mapillary.com/app/?pKey=1191635439743321), by inlandurbanist, 2023-06-20 (GoPro Hero 7), heading 310°, pitch +2.2°.
+- It was taken in the middle of the intersection, 3 m from the signal, looking northwest. It's the newest photo, from 7 years after photos 1–4.
+
+Photos 4 and 5 were picked by metadata only and are **not checked in the viewer** (1.2 m camera height guessed). Photos within 120 m of the signal only face two ways along Sunset (about 140° and 310°), so there are few truly different directions beyond photos 3 and 4. `MAXP` is now 5, which is the limit of one shader loop.
+
 **How it works**
 - `scripts/photo_to_scene.py ID…` fetches the pose and a 2048 px image into `docs/sunset/photos/` and `data/photos.json`.
 - Pose comes from Mapillary SfM: `computed_rotation` (angle-axis, ENU → camera) and `computed_geometry`. Checks: the forward vector gives heading 144.2°, matching `computed_compass_angle`, with pitch +1.6° and roll −4.3°. The position lands in the rightmost eastbound lane of the model's Sunset, which matches what the photo shows.
 - Camera height is **guessed at 1.2 m** from the lane-line perspective. Mapillary altitude isn't reliable.
 - The Mapillary perspective model is applied in the shader: `st = 0.5 + f·(1 + k1·r² + k2·r⁴)·(x/z, y/z)·max(w,h)/(w,h)`. The flat plane uses the same projection, so it shows the photo undistorted.
-- Occlusion uses a depth pass rendered from each photo camera (shadow-map style), so walls behind other buildings aren't painted. Up to 4 photos share one shader loop (`MAXP`). The guessed signal poles are excluded both as occluders and as receivers.
+- Occlusion uses a depth pass rendered from each photo camera (shadow-map style), so walls behind other buildings aren't painted. Up to 5 photos share one shader loop (`MAXP`). The guessed signal poles are excluded both as occluders and as receivers.
 - Projected pixels are unlit: they replace the model colour, with a soft fade at the image edges.
 
 **Can a photo cover the surfaces as presented?** From the vantage, yes, it looks right. Moving away shows what a single photo can and can't do:

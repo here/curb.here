@@ -512,7 +512,7 @@ function readHash() {
 //  - mapped: surfaces receive the projection. Per photo, a depth pass from its camera keeps
 //            hidden surfaces from being painted. Where photos overlap, the first one in
 //            photos.json that sees the surface wins (no blending).
-const MAXP = 4;
+const MAXP = 5;
 const photos = [];
 const photoUI = { flat: $("ph-flat"), mapped: $("ph-mapped") };
 const PHOTO_FN = `
