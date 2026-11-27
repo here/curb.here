@@ -4,6 +4,7 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 - [Panoramax](photos-panoramax.md)
 - [KartaView](photos-kartaview.md)
 - [Mapillary (Meta)](photos-meta-mapillary.md)
+- Other photo/video sources (Wikimedia Commons, Flickr, OSM, Waymo, LADOT, …): [photos-other-sources.md](photos-other-sources.md)
 
 **Example images:** [examples.md](examples.md) (10 per service near Cafe Tropical)
 
