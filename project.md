@@ -14,7 +14,9 @@ Rough bounding box used for queries (lon/lat, WGS84):
 `-118.285,34.075,-118.250,34.105` (Silver Lake reservoir, Sunset Junction, Hyperion/Glendale Blvd).
 
 ## Workstreams
+The plan and deferred items are in [plan/plan.md](plan/plan.md).
+
 - [photos/](photos/photos.md) — street-level / field photo services (Panoramax, KartaView, Mapillary)
 - [map/](map/map-osm.md) — OSM via Overpass ([map-osm.md](map/map-osm.md)); later LA City GeoHub and LA County open data
 - [three/](three/three.md) — three.js 3D model of the Sunset & Silver Lake intersection, served at curb.here/sunset
-- gps — TBD (GPX traces, OSM public traces)
+- gps: deferred (GPX traces, OSM public traces); see [plan/plan.md](plan/plan.md)
