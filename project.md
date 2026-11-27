@@ -16,7 +16,7 @@ Rough bounding box used for queries (lon/lat, WGS84):
 ## Workstreams
 The plan and deferred items are in [plan/plan.md](plan/plan.md).
 
-- [data/location.md](data/location.md) — mobile object locations and linestrings (Overland, GeoJSON, GTFS Realtime)
+- [data/location.md](data/location.md) — mobile object locations and linestrings (Overland, GeoJSON, GTFS Realtime, Waymo Open Dataset)
 - [data/photos/](data/photos/photos.md) — street-level / field photo services (Panoramax, KartaView, Mapillary)
 - [data/map/](data/map/map-osm.md) — OSM via Overpass ([map-osm.md](data/map/map-osm.md)); later LA City GeoHub and LA County open data
 - [data/curb/](data/curb/curb.md) — curb data specs (OMF CDS, MDS) and providers (OpenCurb, CDS vendors)

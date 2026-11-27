@@ -21,3 +21,9 @@ Data sources for mobile object locations and linestrings.
 - Other entities: `TripUpdate` (arrival and departure predictions) and `Alert`.
 - Linestrings: route paths are in `shapes.txt` of the static GTFS. The realtime `Shape` entity (experimental) covers paths not in it, such as detours.
 - **LA Metro** ([developer.metro.net](https://developer.metro.net/api/)): served through Swiftly, agency keys `lametro` (bus) and `lametro-rail` (rail). Needs a Swiftly API key ([request form](https://forms.gle/hXGY6kRGAChDqWwz5)). Vehicle positions refresh every 5 s, trip updates every 10 s. Not requested or tested yet.
+
+## Waymo Open Dataset
+- <https://waymo.com/open/>: Waymo's free research release (Google sign-in). Copied in brief from the [full notes](photos/photos-waymo-open-dataset.md).
+- **Motion** dataset: 103,354 segments of 20 s at 10 Hz, with object tracks and a 3D HD map. Cities include Los Angeles. These tracks are mobile object linestrings.
+- No latitude/longitude: positions are in a local frame with an undisclosed origin, so tracks can't be placed in Silver Lake.
+- License: [non-commercial](https://waymo.com/open/terms/); redistribution only to people who have accepted the same terms. Don't commit the data.
