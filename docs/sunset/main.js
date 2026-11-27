@@ -466,38 +466,37 @@ function readHash() {
 }
 
 // ---- field photos ------------------------------------------------------------------------
-// One photo at a time is projected with its SfM pose and the camera's radial distortion
-// (Mapillary perspective model: f normalised by max(w, h), k1, k2). Two independent toggles:
-//  - flat:   a plane in front of the vantage that the photo is projected onto (undistorted)
-//  - mapped: every surface receives the projection; a depth pass from the photo camera keeps
-//            hidden surfaces (behind buildings) from being painted.
+// Photos are projected with their SfM pose and the camera's radial distortion (Mapillary
+// perspective model: f normalised by max(w, h), k1, k2). Two toggles apply to all photos:
+//  - flat:   each photo on a plane in front of its vantage (undistorted by the same projection)
+//  - mapped: surfaces receive the projection. Per photo, a depth pass from its camera keeps
+//            hidden surfaces from being painted. Where photos overlap, the first one in
+//            photos.json that sees the surface wins (no blending).
+const MAXP = 4;
 const photos = [];
 const photoUI = { flat: $("ph-flat"), mapped: $("ph-mapped") };
-const PHOTO_GLSL = `
-uniform sampler2D photoTex; uniform mat4 photoView; uniform vec3 photoK; uniform vec2 photoScale;
-vec2 photoST(vec3 w) {             // world -> image [0,1]^2 (y down); far outside when not in view
-  vec4 pc = photoView * vec4(w, 1.0);
+const PHOTO_FN = `
+vec2 photoST(vec3 w, mat4 V, vec3 K, vec2 sc) { // world -> image [0,1]^2 (y down); outside when not in view
+  vec4 pc = V * vec4(w, 1.0);
   if (pc.z < 0.3) return vec2(-1.0);
   vec2 n = pc.xy / pc.z; float r2 = dot(n, n);
   if (r2 > 4.0) return vec2(-1.0);
-  float d = 1.0 + photoK.y * r2 + photoK.z * r2 * r2;
-  return 0.5 + photoK.x * d * n * photoScale;
+  float d = 1.0 + K.y * r2 + K.z * r2 * r2;
+  return 0.5 + K.x * d * n * sc;
 }
 float photoEdge(vec2 st) { return smoothstep(0.0, 0.015, min(min(st.x, 1.0 - st.x), min(st.y, 1.0 - st.y))); }
-vec3 photoRGB(vec2 st) { return texture2D(photoTex, vec2(st.x, 1.0 - st.y)).rgb; }
 `;
+const blank = new THREE.DataTexture(new Uint8Array(4), 1, 1); blank.needsUpdate = true;
 const photoU = {
-  photoTex: { value: null }, photoView: { value: new THREE.Matrix4() },
-  photoK: { value: new THREE.Vector3() }, photoScale: { value: new THREE.Vector2(1, 1) },
-  photoOn: { value: 0 }, depthTex: { value: null }, depthMat: { value: new THREE.Matrix4() },
-  depthNF: { value: new THREE.Vector2(0.5, 800) },
+  photoOn: { value: 0 }, photoCount: { value: 0 }, depthNF: { value: new THREE.Vector2(0.5, 800) },
+  photoTex: { value: Array(MAXP).fill(blank) }, photoDepth: { value: Array(MAXP).fill(blank) },
+  photoView: { value: Array.from({ length: MAXP }, () => new THREE.Matrix4()) },
+  photoDepthMat: { value: Array.from({ length: MAXP }, () => new THREE.Matrix4()) },
+  photoK: { value: Array.from({ length: MAXP }, () => new THREE.Vector3()) },
+  photoScale: { value: Array.from({ length: MAXP }, () => new THREE.Vector2(1, 1)) },
 };
-const depthCam = new THREE.PerspectiveCamera(115, 4 / 3, 0.5, 800);
-depthCam.layers.set(1);
-const depthRT = new THREE.WebGLRenderTarget(2048, 2048, { depthTexture: new THREE.DepthTexture(2048, 2048) });
-let photoGroup = null, current = null;
 
-// Patch the Lambert materials so they can receive the projected photo (unlit, replaces colour).
+// Patch the Lambert materials so they can receive the projected photos (unlit, replaces colour).
 function patchMaterial(mat) {
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, photoU);
@@ -506,26 +505,39 @@ function patchMaterial(mat) {
       .replace("#include <project_vertex>", "#include <project_vertex>\nvPhotoW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", `#include <common>
-varying vec3 vPhotoW; uniform float photoOn; uniform sampler2D depthTex; uniform mat4 depthMat; uniform vec2 depthNF;
-${PHOTO_GLSL}
-float photoVisible(vec3 w) {
-  vec4 dc = depthMat * vec4(w, 1.0);
+varying vec3 vPhotoW; uniform float photoOn; uniform int photoCount; uniform vec2 depthNF;
+uniform sampler2D photoTex[${MAXP}]; uniform sampler2D photoDepth[${MAXP}];
+uniform mat4 photoView[${MAXP}]; uniform mat4 photoDepthMat[${MAXP}];
+uniform vec3 photoK[${MAXP}]; uniform vec2 photoScale[${MAXP}];
+${PHOTO_FN}
+float photoVisible(vec3 w, mat4 DM, sampler2D D) {
+  vec4 dc = DM * vec4(w, 1.0);
   vec3 dn = dc.xyz / dc.w;
   if (any(greaterThan(abs(dn.xy), vec2(1.0)))) return 0.0;
-  float z = texture2D(depthTex, dn.xy * 0.5 + 0.5).x * 2.0 - 1.0;
+  float z = texture2D(D, dn.xy * 0.5 + 0.5).x * 2.0 - 1.0;
   float n = depthNF.x, f = depthNF.y;
   float lin = 2.0 * n * f / (f + n - z * (f - n));
   return step(dc.w, lin + 0.3 + 0.015 * dc.w);
 }`)
       .replace("#include <opaque_fragment>", `#include <opaque_fragment>
 if (photoOn > 0.5) {
-  vec2 st = photoST(vPhotoW);
-  float a = photoEdge(st);
-  if (a > 0.0) a *= photoVisible(vPhotoW);
-  if (a > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, photoRGB(st), a);
+  bool photoDone = false;
+  #pragma unroll_loop_start
+  for ( int i = 0; i < ${MAXP}; i ++ ) {
+    if (!photoDone && UNROLLED_LOOP_INDEX < photoCount) {
+      vec2 st = photoST(vPhotoW, photoView[ i ], photoK[ i ], photoScale[ i ]);
+      float a = photoEdge(st);
+      if (a > 0.0) a *= photoVisible(vPhotoW, photoDepthMat[ i ], photoDepth[ i ]);
+      if (a > 0.0) {
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, texture2D(photoTex[ i ], vec2(st.x, 1.0 - st.y)).rgb, a);
+        photoDone = a > 0.99;
+      }
+    }
+  }
+  #pragma unroll_loop_end
 }`);
   };
-  mat.customProgramCacheKey = () => "photo-v1";
+  mat.customProgramCacheKey = () => "photo-v2";
   mat.needsUpdate = true;
 }
 
@@ -539,117 +551,145 @@ function undistort(ux, uy, P) {
   return [nx, ny];
 }
 
-function photoBasis(P) {
+function photoSetup(P) {
   // R_enu maps ENU (e, n, u) to camera (right, down, forward). three: x=e, y=u, z=-n.
   const R = P.R_enu, row = (i) => new THREE.Vector3(R[i][0], R[i][2], -R[i][1]);
   const right = row(0), down = row(1), fwd = row(2);
   const C = new THREE.Vector3(P.p[0], ground(P.p[0], P.p[1]) + P.h, P.p[1]);
-  return { right, down, fwd, C };
-}
-
-function photoQuat(B) { // three.js camera: +x right, +y up, looks down -z
-  const m = new THREE.Matrix4().makeBasis(B.right, B.down.clone().negate(), B.fwd.clone().negate());
-  return new THREE.Quaternion().setFromRotationMatrix(m);
-}
-
-function selectPhoto(P) {
-  current = P;
-  const B = photoBasis(P);
-  const v = photoU.photoView.value, t = B.C;
-  const r = [B.right, B.down, B.fwd];
-  v.set(...r.flatMap((a) => [a.x, a.y, a.z, -a.dot(t)]), 0, 0, 0, 1);
+  const view = new THREE.Matrix4().set(...[right, down, fwd].flatMap((a) => [a.x, a.y, a.z, -a.dot(C)]), 0, 0, 0, 1);
+  const quat = new THREE.Quaternion().setFromRotationMatrix( // three.js camera: +x right, +y up, looks down -z
+    new THREE.Matrix4().makeBasis(right, down.clone().negate(), fwd.clone().negate()));
   const mx = Math.max(P.width, P.height);
-  photoU.photoK.value.set(P.f, P.k1, P.k2);
-  photoU.photoScale.value.set(mx / P.width, mx / P.height);
-  photoU.photoTex.value = P.texture;
-  // depth pass from the photo camera (scene is static, so once per photo)
-  depthCam.position.copy(B.C); depthCam.quaternion.copy(photoQuat(B));
-  depthCam.updateMatrixWorld(); depthCam.updateProjectionMatrix();
-  photoU.depthMat.value.multiplyMatrices(depthCam.projectionMatrix, depthCam.matrixWorldInverse);
-  const on = photoU.photoOn.value; photoU.photoOn.value = 0; photoU.depthTex.value = null; // no feedback loop
-  renderer.setRenderTarget(depthRT); renderer.render(scene, depthCam); renderer.setRenderTarget(null);
-  photoU.depthTex.value = depthRT.depthTexture; photoU.photoOn.value = on;
-  buildFlat(P, B);
-}
-
-// Flat photo: a plane D metres in front of the vantage, with a frustum outline and a marker.
-function buildFlat(P, B) {
-  if (photoGroup) scene.remove(photoGroup);
-  photoGroup = new THREE.Group();
-  const D = 6, mx = Math.max(P.width, P.height);
   const hx = 0.5 * P.width / mx, hy = 0.5 * P.height / mx;
   const corners = [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]].map(([ux, uy]) => undistort(ux, uy, P));
-  const ext = corners.reduce((a, [x, y]) => [Math.max(a[0], Math.abs(x)), Math.max(a[1], Math.abs(y))], [0, 0]);
-  const at = (nx, ny, dist) => B.C.clone().addScaledVector(B.fwd, dist)
-    .addScaledVector(B.right, nx * dist).addScaledVector(B.down, ny * dist);
+  const at = (nx, ny, dist) => C.clone().addScaledVector(fwd, dist).addScaledVector(right, nx * dist).addScaledVector(down, ny * dist);
+  Object.assign(P, { right, down, fwd, C, view, quat, corners, at, scale: new THREE.Vector2(mx / P.width, mx / P.height),
+    vfov: THREE.MathUtils.radToDeg(2 * Math.atan(undistort(0, hy, P)[1])),
+    // points used to decide whether a photo's coverage is in the viewer's view
+    probes: [C, ...[5, 20, 50].flatMap((d) => [at(0, 0, d), ...corners.map(([x, y]) => at(x, y, d))])] });
+}
+
+// Depth pass from each photo camera (the scene is static, so once per photo).
+function renderPhotoDepth(P, i) {
+  const vf = 2 * Math.atan(Math.max(...P.corners.map(([, y]) => Math.abs(y))) * 1.1);
+  const cam = new THREE.PerspectiveCamera(Math.min(170, THREE.MathUtils.radToDeg(vf)), 1, depthNF().x, depthNF().y);
+  cam.layers.set(1);
+  cam.position.copy(P.C); cam.quaternion.copy(P.quat); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
+  // aspect so the horizontal extent (corners, with distortion) is covered too
+  cam.aspect = Math.max(...P.corners.map(([x]) => Math.abs(x))) * 1.1 / Math.tan(vf / 2); cam.updateProjectionMatrix();
+  P.depthRT = new THREE.WebGLRenderTarget(2048, 2048, { depthTexture: new THREE.DepthTexture(2048, 2048) });
+  const on = photoU.photoOn.value; photoU.photoOn.value = 0; // never sample a depth texture while writing one
+  renderer.setRenderTarget(P.depthRT); renderer.render(scene, cam); renderer.setRenderTarget(null);
+  photoU.photoOn.value = on;
+  photoU.photoDepth.value[i] = P.depthRT.depthTexture;
+  photoU.photoDepthMat.value[i].multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+}
+const depthNF = () => photoU.depthNF.value;
+
+// Flat photo: a plane D metres in front of the vantage, with a frustum outline and a marker.
+function buildFlat(P) {
+  const g0 = new THREE.Group(), D = 6;
+  const ext = P.corners.reduce((a, [x, y]) => [Math.max(a[0], Math.abs(x)), Math.max(a[1], Math.abs(y))], [0, 0]);
   // plane big enough for every ray; the shader cuts it to the photo's (distorted) outline
-  const g = new THREE.BufferGeometry().setFromPoints([at(-ext[0], -ext[1], D), at(ext[0], -ext[1], D),
-    at(ext[0], ext[1], D), at(-ext[0], ext[1], D)]);
+  const g = new THREE.BufferGeometry().setFromPoints([P.at(-ext[0], -ext[1], D), P.at(ext[0], -ext[1], D),
+    P.at(ext[0], ext[1], D), P.at(-ext[0], ext[1], D)]);
   g.setIndex([0, 2, 1, 0, 3, 2]);
   const mat = new THREE.ShaderMaterial({
-    uniforms: photoU, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+    uniforms: { tex: { value: P.texture }, V: { value: P.view }, K: { value: new THREE.Vector3(P.f, P.k1, P.k2) }, sc: { value: P.scale } },
+    side: THREE.DoubleSide, depthTest: false, depthWrite: false,
     vertexShader: `varying vec3 vW; void main() { vW = (modelMatrix * vec4(position, 1.0)).xyz;
       gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`,
-    fragmentShader: `varying vec3 vW; ${PHOTO_GLSL}
-      void main() { vec2 st = photoST(vW); if (photoEdge(st) <= 0.0) discard;
-        gl_FragColor = vec4(photoRGB(st), 1.0);
+    fragmentShader: `varying vec3 vW; uniform sampler2D tex; uniform mat4 V; uniform vec3 K; uniform vec2 sc; ${PHOTO_FN}
+      void main() { vec2 st = photoST(vW, V, K, sc); if (photoEdge(st) <= 0.0) discard;
+        gl_FragColor = vec4(texture2D(tex, vec2(st.x, 1.0 - st.y)).rgb, 1.0);
         #include <colorspace_fragment>
       }`,
   });
   const plane = new THREE.Mesh(g, mat); plane.renderOrder = 999;
   const pts = [];
-  for (const [x, y] of corners) pts.push(B.C, at(x, y, D));
-  corners.forEach(([x, y], i) => { const [x2, y2] = corners[(i + 1) % 4]; pts.push(at(x, y, D), at(x2, y2, D)); });
+  P.corners.forEach(([x, y], i) => {
+    const [x2, y2] = P.corners[(i + 1) % 4];
+    pts.push(P.C, P.at(x, y, D), P.at(x, y, D), P.at(x2, y2, D));
+  });
   const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
   lines.renderOrder = 998;
   const dot = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff7a00 }));
-  dot.position.copy(B.C);
-  photoGroup.add(plane, lines, dot);
-  photoGroup.visible = photoUI.flat.checked;
-  scene.add(photoGroup);
+  dot.position.copy(P.C);
+  g0.add(plane, lines, dot);
+  scene.add(g0);
+  P.flat = g0;
 }
 
 function goVantage(P) {
-  if (current !== P) selectPhoto(P);
-  const B = photoBasis(P), mx = Math.max(P.width, P.height);
-  const [, ny] = undistort(0, 0.5 * P.height / mx, P);
-  setMode("street", { x: P.p[0], z: P.p[1], vantage: {
-    id: P.id, eye: P.h, quat: photoQuat(B), fov: THREE.MathUtils.radToDeg(2 * Math.atan(ny)) } });
+  setMode("street", { x: P.p[0], z: P.p[1], vantage: { id: P.id, eye: P.h, quat: P.quat, fov: P.vfov } });
 }
 
 function applyPhotoToggles() {
-  if (photoGroup) photoGroup.visible = photoUI.flat.checked;
+  for (const P of photos) P.flat.visible = photoUI.flat.checked;
   photoU.photoOn.value = photoUI.mapped.checked ? 1 : 0;
-  const on = photoUI.flat.checked || photoUI.mapped.checked;
-  $("photo-credit").hidden = !on || !current;
-  if (current) {
-    const a = $("photo-credit").querySelector("a");
-    a.href = current.url;
-    a.textContent = `${current.creator}, ${new Date(current.captured_at).toISOString().slice(0, 10)}`;
-  }
+  updatePhotoInfo(true);
   saveHash();
+}
+
+// "Photos in view": time range and credits for the shown photos whose coverage is on screen.
+const timeFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "short",
+  day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+const frustum = new THREE.Frustum(), projView = new THREE.Matrix4();
+let lastInfo = 0, lastKey = "";
+function updatePhotoInfo(force = false) {
+  const now = performance.now();
+  if (!photos.length || (!force && now - lastInfo < 300)) return;
+  lastInfo = now;
+  const on = photoUI.flat.checked || photoUI.mapped.checked;
+  camera.updateMatrixWorld();
+  frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+  const seen = on ? photos.filter((P) => P.probes.some((p) => frustum.containsPoint(p))) : [];
+  const key = on + seen.map((P) => P.id).join();
+  if (!force && key === lastKey) return;
+  lastKey = key;
+  const el = $("photo-time"), credit = $("photo-credit");
+  el.hidden = !on; credit.hidden = !seen.length;
+  if (!on) return;
+  if (!seen.length) { el.textContent = "Photos in view: none"; return; }
+  const t = seen.map((P) => P.captured_at).sort((a, b) => a - b);
+  const a = timeFmt.format(t[0]), b = timeFmt.format(t[t.length - 1]);
+  el.textContent = `Photos in view (${seen.length}): ` + (a === b ? a : `${a} – ${b}`);
+  credit.replaceChildren(" · Photos ", ...seen.flatMap((P, i) => {
+    const l = document.createElement("a");
+    Object.assign(l, { href: P.url, target: "_blank", rel: "noopener", textContent: `${P.creator} ${new Date(P.captured_at).toISOString().slice(0, 10)}` });
+    return i ? [", ", l] : [l];
+  }), " via Mapillary, CC BY-SA 4.0");
 }
 
 async function setupPhotos() {
   let list = [];
   try { list = (await (await fetch("./data/photos.json")).json()).photos; } catch { return; }
   const loader = new THREE.TextureLoader();
-  for (const P of list) {
+  for (const P of list.slice(0, MAXP)) {
     P.texture = await loader.loadAsync("./" + P.image);
     P.texture.colorSpace = THREE.SRGBColorSpace;
     P.texture.anisotropy = 8;
+    photoSetup(P);
     photos.push(P);
   }
   if (!photos.length) return;
   scene.traverse((o) => {
     if (!o.isMesh || o.userData.noPhoto) return;
-    o.layers.enable(1);                       // seen by the photo depth pass
+    o.layers.enable(1);                       // seen by the photo depth passes
     if (o.material?.isMeshLambertMaterial) patchMaterial(o.material);
   });
-  selectPhoto(photos[0]);
+  photos.forEach((P, i) => {
+    photoU.photoTex.value[i] = P.texture;
+    photoU.photoView.value[i] = P.view;
+    photoU.photoK.value[i].set(P.f, P.k1, P.k2);
+    photoU.photoScale.value[i].copy(P.scale);
+    renderPhotoDepth(P, i);
+  });
+  photoU.photoCount.value = photos.length;
   for (const P of photos) {
-    const label = `Photo vantage (${new Date(P.captured_at).toISOString().slice(0, 10)})`;
+    buildFlat(P);
+    const label = `Photo vantage ${new Date(P.captured_at).toISOString().slice(0, 10)}`;
     presets.push({ name: label, photo: P });
     $("preset").add(new Option(label, presets.length - 1));
   }
@@ -675,5 +715,6 @@ renderer.setAnimationLoop(() => {
   if (mode === "street") updateStreet(dt); else orbit.update();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
+  updatePhotoInfo();
 });
 window.__scene = { scene, camera, S, photos }; // for debugging in the console

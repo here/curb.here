@@ -179,20 +179,30 @@ The viewer has two checkboxes, shown when `docs/sunset/data/photos.json` has pho
 - **Field photos flat:** the photo alone, on a plane 6 m in front of where it was taken. An orange frustum and dot mark the vantage. The plane is drawn on top of everything.
 - **Field photos mapped:** the photo is projected onto the model's surfaces: terrain, roads, sidewalks, curbs and buildings.
 
+Where photos overlap, **the first photo in `photos.json` that sees a surface wins**. There's no blending, and order is sequential: photo 1, then photo 2. A pill under the toolbar shows **"Photos in view"**: the capture-time range (LA time) of the shown photos whose coverage is on screen, tested by probing points along each photo's frustum. The credits line lists the same photos.
+
 The toggles are stored in the URL hash (`ph=f`, `ph=m`, `ph=fm`). "Jump to… → Photo vantage" puts the camera at the photo's position, orientation (including roll) and vertical FOV. For example, `#v=street&ph=m&at=963797397764501`.
 
-**Photo used:** Mapillary [963797397764501](https://www.mapillary.com/app/?pKey=963797397764501), by gyllen, 2016-01-30, CC BY-SA 4.0.
+**Photo 1:** Mapillary [963797397764501](https://www.mapillary.com/app/?pKey=963797397764501), by gyllen, 2016-01-30, CC BY-SA 4.0.
 - It's the oldest usable photo near the intersection; the area has photos from 2016, 2018, 2019, 2022, 2023 and 2026.
 - It was taken eastbound on Sunset, in the rightmost lane, 45 m from the signal, looking at the intersection. The storefronts on the right include Silverlake Lounge, next door to Cafe Tropical.
 - The camera is a Garmin VIRB XE: wide (about 98° horizontal) with barrel distortion. The sky is overcast, so there are no hard shadows.
 - I viewed 1 of a 10-photo budget. I picked candidates by metadata first: non-panoramic, 15–70 m from the signal, heading within 35° of it, oldest first.
+
+**Photo 2:** Mapillary [1029666137832944](https://www.mapillary.com/app/?pKey=1029666137832944), by mapkin, 2016-08-04 10:44 PDT, CC BY-SA 4.0.
+- It was taken westbound on Sunset from the far (east) side of the intersection, about 50 m out, looking northwest. That's nearly opposite photo 1.
+- The Cafe Tropical facade, sign and awning are on the left, the WOOD bar (2861 Sunset) is on the right, and the intersection overlaps with photo 1.
+- The camera is an iPhone 5s, narrower than photo 1 (about ±31° horizontal), with pitch +8.4°. Camera height is guessed at 1.3 m.
+- It's sunny, where photo 1 is overcast, so the seam between the two photos is visible.
+- How it was chosen: the closest date with a different direction and the cafe in frame. The same-day frames from photo 1's sequence were rejected as too similar.
+- Photos viewed so far: 3 (photo 1, the rejected same-day frame, and photo 2).
 
 **How it works**
 - `scripts/photo_to_scene.py ID…` fetches the pose and a 2048 px image into `docs/sunset/photos/` and `data/photos.json`.
 - Pose comes from Mapillary SfM: `computed_rotation` (angle-axis, ENU → camera) and `computed_geometry`. Checks: the forward vector gives heading 144.2°, matching `computed_compass_angle`, with pitch +1.6° and roll −4.3°. The position lands in the rightmost eastbound lane of the model's Sunset, which matches what the photo shows.
 - Camera height is **guessed at 1.2 m** from the lane-line perspective. Mapillary altitude isn't reliable.
 - The Mapillary perspective model is applied in the shader: `st = 0.5 + f·(1 + k1·r² + k2·r⁴)·(x/z, y/z)·max(w,h)/(w,h)`. The flat plane uses the same projection, so it shows the photo undistorted.
-- Occlusion uses a depth pass rendered from the photo camera (shadow-map style), so walls behind other buildings aren't painted. The guessed signal poles are excluded both as occluders and as receivers.
+- Occlusion uses a depth pass rendered from each photo camera (shadow-map style), so walls behind other buildings aren't painted. Up to 4 photos share one shader loop (`MAXP`). The guessed signal poles are excluded both as occluders and as receivers.
 - Projected pixels are unlit: they replace the model colour, with a soft fade at the image edges.
 
 **Can a photo cover the surfaces as presented?** From the vantage, yes, it looks right. Moving away shows what a single photo can and can't do:
@@ -204,6 +214,8 @@ The toggles are stored in the URL hash (`ph=f`, `ph=m`, `ph=fm`). "Jump to… �
   - Surfaces seen at grazing angles stretch into streaks: walls running along the view direction, and the road right in front of the camera.
   - Cars, poles and palms get flattened onto the road and walls, so they look right only from the vantage.
   - Where the model's walls are set back from the real facades, or heights are off, content slides.
+  - Things missing from the model (cars, poles) don't stop the rays, so their pixels land on whatever is behind, sometimes a far wall.
+  - With two photos, the intersection road is hit at grazing angles from both sides, so from above it's mostly streaks.
 
 Covering the intersection properly would take **many photos blended per surface**: for each fragment, use the photo that sees it most head-on and closest. Possible sources:
 - The same 2016 sequence has 5 frames from 24 to 66 m out.
