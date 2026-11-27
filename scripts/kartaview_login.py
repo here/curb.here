@@ -8,7 +8,9 @@ Setup (once):
        - Permissions:             Read user preferences (read_prefs)
   2. Put the client ID in .env:  OSM_CLIENT_ID="..."
 
-Run:  python3 -I scripts/kartaview_login.py
+Run:  python3 -I scripts/kartaview_login.py                 (interactive)
+  or: python3 -I scripts/kartaview_login.py --url           (step 1: print URL, save PKCE state)
+      python3 -I scripts/kartaview_login.py --code <CODE>   (step 2: finish with the pasted code)
   - opens/prints an OSM authorize URL; approve it in any browser
   - paste the code shown by OSM back here
   - the script exchanges it for an OSM token, then for a KartaView token,
@@ -22,6 +24,7 @@ OSM = "https://www.openstreetmap.org"
 KV_API = "https://api.kartaview.org"   # api.openstreetcam.org times out as of 2026-11-27
 REDIRECT = "urn:ietf:wg:oauth:2.0:oob"
 SCOPE = "read_prefs"
+STATE_FILE = ENV.parent / ".kartaview_login_state"   # gitignored; holds the PKCE verifier between steps
 
 
 def load_env():
@@ -62,6 +65,13 @@ def main():
     load_env()
     client_id = os.environ.get("OSM_CLIENT_ID") or sys.exit("Set OSM_CLIENT_ID in .env first (see docstring).")
 
+    args = sys.argv[1:]
+    if args[:1] == ["--code"]:
+        if len(args) < 2 or not STATE_FILE.exists():
+            sys.exit("Run with --url first, then --code <CODE>.")
+        verifier = STATE_FILE.read_text().strip()
+        return finish(client_id, verifier, args[1].strip())
+
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = secrets.token_urlsafe(16)
@@ -70,10 +80,21 @@ def main():
         "scope": SCOPE, "code_challenge": challenge, "code_challenge_method": "S256", "state": state,
     })
     print("1. Open this URL in a browser and approve:\n\n   " + url + "\n")
+    if args[:1] == ["--url"]:
+        old = os.umask(0o077)
+        try:
+            STATE_FILE.write_text(verifier)
+        finally:
+            os.umask(old)
+        print("2. Then run:  python3 -I scripts/kartaview_login.py --code <CODE>")
+        return
     code = input("2. Paste the authorization code shown by OSM: ").strip()
     if not code:
         sys.exit("No code entered.")
+    finish(client_id, verifier, code)
 
+
+def finish(client_id, verifier, code):
     status, body = post(f"{OSM}/oauth2/token", {
         "grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
         "client_id": client_id, "code_verifier": verifier,
@@ -95,6 +116,7 @@ def main():
     if not kv_token:
         sys.exit(f"Unexpected client_auth response shape (keys only): {list(json.loads(body)) if body.startswith('{') else body[:100]}")
     save_env("KARTAVIEW_ACCESS_TOKEN", kv_token)
+    STATE_FILE.unlink(missing_ok=True)
     print(f"   KartaView token: saved to {ENV} as KARTAVIEW_ACCESS_TOKEN")
 
     # Which auth header does the API accept? (docs disagree)
