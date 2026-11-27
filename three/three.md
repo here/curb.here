@@ -1,8 +1,10 @@
 # three.js: Sunset & Silver Lake in the browser
 
-Plan for a 3D model of the **Sunset Blvd & Silver Lake Blvd** intersection, around Cafe Tropical, that you can look around with the mouse.
+Status (2026-11-27): **built and live** at https://curb.here/sunset/. This file is the plan and notes for the model, the controls and the hosting.
+
+A 3D model of the **Sunset Blvd & Silver Lake Blvd** intersection, around Cafe Tropical, that you can look around with the mouse.
 - Geometry comes from OSM. Where OSM has no value, we guess and record the guess (see [Guessing rules](#guessing-rules)).
-- Field photos (Mapillary, KartaView, Panoramax) are **out of scope for now**.
+- Field photos (Mapillary) can be shown flat or projected onto the model; see [three-photos.md](three-photos.md). KartaView and Panoramax photos aren't used yet.
 - Hosting: GitHub Pages serves static files, and a Cloudflare Worker (deployed with `wrangler`) serves them at **https://curb.here/sunset/**.
 
 ## What OSM has here (checked 2026-11-27, focus bbox via overpass.ch)
@@ -85,22 +87,22 @@ Run `scripts/osm_to_scene.py` to fetch and bake, or `scripts/osm_to_scene.py --o
 - **Labels:** street names as sprites at road midpoints, with Cafe Tropical as a pin (node 4166608938) and an attribution overlay in the corner.
 - **Lighting:** `HemisphereLight` plus one `DirectionalLight` placed at the LA afternoon sun angle (a nice touch for "sunset"), with soft shadows on a 512 m map. Optionally, set the sun from the current time.
 
-## Mouse navigation
-There are two modes, toggled by a button and the `V` key:
-1. **Orbit (default):** `OrbitControls` targeting the intersection.
-   - Left-drag rotates, right-drag pans (at 2× the default speed), and the wheel zooms.
-   - Clamp `maxPolarAngle` just below horizontal, `minDistance` to 5 m and `maxDistance` to 400 m, and turn on damping.
-2. **Street view ("stand on the curb"):** the camera sits at eye height (1.6 m above terrain).
-   - Drag to look around, using `PointerLockControls` or a simple yaw/pitch drag handler. Drag is friendlier than pointer lock on trackpads and phones.
-   - Move with WASD or the arrow keys, keep the camera clamped to the terrain height, and double-click to jump to a point on the ground (raycast).
-   - Preset spots: the four corners, the Cafe Tropical door and the bridge.
-- Phones and tablets (`pointer: coarse`): orbit view only, using `OrbitControls`' touch handling (drag, two-finger pan, pinch). Street view is off until it has a walk control; see Steps. The photo vantage presets still work there: they put the orbit camera at the photo's position and field of view, looking where it looked (you can then orbit from there).
-- Keyboard (built 2026-11-27):
-  - Street view: W/S (or ↑/↓) walk at 8 m/s, or 28 m/s with Left Shift. A/D (or ←/→) **turn**; hold Right Shift or `/` to strafe instead. Space jumps (about 3 m up, then back to the ground).
-  - Orbit: WASD or the arrow keys move over the ground (speed scales with zoom), Q/E rotate around the target, R/F tilt, and +/− or PgUp/PgDn zoom. Left Shift is 3× faster.
-  - Street view: the mouse wheel zooms by changing the field of view (15°–100°). Changing view mode or jumping resets it to 60°.
-  - Walking away from a photo vantage keeps the photo's look direction.
-- Put the camera state in the URL hash, for example `#v=street&x=12.3&z=-4.0&yaw=90`, so a view can be shared as a link.
+## Navigation
+The viewer opens in **orbit** view with the buttons hidden. **Show buttons**, next to the title, reveals the rest; the **reset** button before it returns to the defaults and reloads. The camera state is kept in the URL hash (for example `#v=street&x=12.3&z=-4.0&yaw=1.2`), so a view can be shared as a link.
+
+| | Orbit (default, `OrbitControls`) | Street view (eye height 1.6 m) |
+|---|---|---|
+| Mouse | left-drag rotates, right-drag pans (2× speed), wheel zooms; double-click focuses a point | drag looks around, wheel zooms (field of view 15°–100°), double-click goes to a ground point |
+| Move | W A S D or arrows move over the ground (speed scales with zoom) | W/S or ↑/↓ walk at 8 m/s (28 m/s with Left Shift) |
+| Turn | Q/E rotate, R/F tilt | A/D or ←/→ turn; hold Right Shift or `/` to strafe instead |
+| Zoom | + / − or PgUp / PgDn | mouse wheel |
+| Other | Left Shift is 3× faster | Space jumps (about 3 m, then falls back); `V` switches to orbit |
+
+- `V` toggles between orbit and street view.
+- Orbit clamps the polar angle just below horizontal, distance 5–400 m, with damping.
+- Presets in the "Jump to…" menu: overview, the four corners, Cafe Tropical, the Sunset bridge, and one vantage per photo.
+- **Touchscreens** (`pointer: coarse`): orbit only (drag, two-finger pan, pinch). Street view is off because there's no way to walk (see Steps). Photo vantages still work: they put the orbit camera at the photo, looking where it looked.
+- Walking away from a photo vantage keeps the photo's look direction.
 
 ## Guessing rules
 Each guess lives in **one table in the pipeline**, and every guessed value is flagged (`"guessed": true`) in `scene.json` so the UI can show it later.
@@ -158,119 +160,48 @@ curl -I https://curb.here/sunset/
 
 ## Layout
 ```
-three/three.md              this file
-three/cache/osm.json        raw Overpass extract (gitignored)
-scripts/osm_to_scene.py     Overpass → docs/sunset/data/scene.json
-docs/sunset/index.html      import map, UI (mode toggle, presets, attribution)
-docs/sunset/main.js         scene build + controls
-docs/sunset/data/scene.json baked data (committed)
-docs/sunset/data/photos.json  field photo poses; images in docs/sunset/photos/ (scripts/photo_to_scene.py)
+three/three.md                  this file (model, controls, hosting)
+three/three-photos.md           field photos: list, method, limits
+three/cache/osm.json            raw Overpass extract (gitignored)
+scripts/osm_to_scene.py         Overpass → docs/sunset/data/scene.json
+scripts/photo_to_scene.py       Mapillary photo → docs/sunset/photos/ and data/photos.json
+scripts/stamp_sunset.py         content-hash ?v= in index.html (run by both bakers)
+docs/sunset/index.html          import map, toolbar, attribution
+docs/sunset/main.js             scene build, controls, photo projection
+docs/sunset/data/scene.json     baked OSM data (committed)
+docs/sunset/data/photos.json    photo poses
+docs/sunset/photos/             photo images (2048 px)
 worker/wrangler.toml, worker/src/index.js
 ```
 **Cache-busting:** after changing anything in `docs/sunset/`, run `scripts/stamp_sunset.py` and commit `index.html` along with the change. The two bakers run it automatically.
 - It stamps `main.js?v=<content hash>` into `index.html`. `main.js` passes the same `?v=` on to `scene.json`, `photos.json` and the photo images, so a page load never mixes old and new files.
 - Why it's needed: the curb.here zone sends `Cache-Control: max-age=14400` (Cloudflare's default 4-hour browser cache), overriding GitHub's 10 minutes.
-- `index.html` gets `no-cache` from the Worker (see Hosting), so a new stamp is picked up on the next load.
+- `index.html` gets `no-cache` from the Worker (see Hosting), so a new stamp is picked up on the next load. The viewer's **reset** button forces a fresh load.
+- Changing only `index.html` leaves the stamp unchanged (it isn't part of the hash), which is fine because `index.html` is never cached.
 
 To view locally, run `python3 -m http.server -d docs 8000` and open http://localhost:8000/sunset/.
 
 ## Steps
-- [x] `scripts/osm_to_scene.py`: extract, clip, project and terrain; first bake committed (2026-11-27).
-- [x] `docs/sunset/`: terrain, buildings, roads with lane lines, sidewalks with curb faces, crosswalks, guessed signal poles, labels and shadows.
-- [x] Orbit and street-view modes, presets (overview, four corners, Cafe Tropical, the bridge) and shareable URL-hash views.
-- [x] Worker code tested locally.
-- [x] Deploy the Worker. `https://curb.here/sunset/` loads (2026-11-27).
+Done (2026-11-27):
+- [x] OSM bake (`osm_to_scene.py`): clip, project, terrain from building `ele`.
+- [x] Viewer: terrain, buildings, roads with lane lines, sidewalks with curb faces, crosswalks, guessed signal poles, labels, shadows.
+- [x] Orbit and street view, keyboard and mouse controls, presets, shareable URL-hash views, touch fallback.
+- [x] Field photos: 10 Mapillary photos, flat and mapped, with per-photo toggles ([three-photos.md](three-photos.md)).
+- [x] Worker deployed with explicit caching, and cache-busting of the viewer's files. `https://curb.here/sunset/` is live.
+
+Open:
+- [ ] **Street-view walk mode for touchscreens.** On-screen controls: a virtual joystick or drag-to-walk, plus a jump button.
 - [ ] Curb ramps at `kerb=lowered` nodes. Today only tactile pads are drawn, and the sidewalk slab is raised everywhere.
 - [ ] Junction areas: lane lines stop 7 m short of each way's end, and the junction box isn't drawn as its own surface yet.
 - [ ] Road widths from the gap between the mapped sidewalks, instead of lane counts.
 - [ ] Turn arrows from `turn:lanes:*`.
-- [ ] **TODO: street-view walk mode for touchscreens.** Street view is disabled on touch devices because there's no way to walk. It needs on-screen controls: a virtual joystick or drag-to-walk, plus a jump button.
-- [ ] Consider: flat photos appear to jump when you jump in street view (parallax from the 6 m panels). Options are listed in [plan/plan.md](../plan/plan.md), "For consideration".
+- [ ] Consider: flat photos appear to jump when you jump in street view ([plan/plan.md](../plan/plan.md), "For consideration").
 - [ ] Hide far labels. CSS labels show through buildings.
-- [ ] Find out what passes under the Sunset bridge (way 30528196) and fix the bridge model.
+- [ ] Find out what passes under the Sunset bridge (way 30528196) and fix the bridge model. Bridge lane markings are skipped.
 - [ ] Better ground: USGS 3DEP 1 m DTM instead of building `ele`.
-
-## Field photos (first try, 2026-11-27)
-The viewer has two checkboxes, "Photos flat" and "Photos mapped", shown when `docs/sunset/data/photos.json` has photos:
-- **Field photos flat:** the photo alone, on a plane 6 m in front of where it was taken. An orange frustum and dot mark the vantage. The plane is drawn on top of everything.
-- **Field photos mapped:** the photo is projected onto the model's surfaces: terrain, roads, sidewalks, curbs and buildings.
-
-Where photos overlap, **the first photo in `photos.json` that sees a surface wins**. There's no blending, and order is sequential: photo 1, then photo 2. A pill under the toolbar shows **"Photos in view"**: the capture-time range (LA time) of the shown photos whose coverage is on screen, tested by probing points along each photo's frustum. The credits line lists the same photos.
-
-**Reset button** (circular-arrow icon before "Show buttons"): drops the saved view and reloads from a fresh `?r=` URL, so everything returns to the defaults below and the browser refetches the page and, through its new `?v=`, the scripts, data and photos. The `?r=` is removed from the address bar after loading.
-
-**Defaults:** the buttons are hidden (use "Show buttons" next to the title; `ui=1` in the URL keeps them showing), photos are shown flat, not mapped, and all 10 are on. A link with `ph=` in it overrides this (`ph=` alone means both off).
-
-Numbered checkboxes (**1**, **2**, …) turn individual photos on or off. The number is also the precedence order, and flat mode labels each vantage with its number.
-
-The toggles are stored in the URL hash: `ph=f`, `ph=m` or `ph=fm`, plus `poff=2` for photos switched off. "Jump to… → Photo vantage" puts the camera **10 ft (3 m) behind** the photo's position (along its horizontal look direction, same height), so the frame can see around the photo's edges, orientation (including roll) and vertical FOV. For example, `#v=street&ph=m&at=963797397764501`.
-
-**Photo 1:** Mapillary [963797397764501](https://www.mapillary.com/app/?pKey=963797397764501), by gyllen, 2016-01-30, CC BY-SA 4.0.
-- It's the oldest usable photo near the intersection; the area has photos from 2016, 2018, 2019, 2022, 2023 and 2026.
-- It was taken eastbound on Sunset, in the rightmost lane, 45 m from the signal, looking at the intersection. The storefronts on the right include Silverlake Lounge, next door to Cafe Tropical.
-- The camera is a Garmin VIRB XE: wide (about 98° horizontal) with barrel distortion. The sky is overcast, so there are no hard shadows.
-- I viewed 1 of a 10-photo budget. I picked candidates by metadata first: non-panoramic, 15–70 m from the signal, heading within 35° of it, oldest first.
-
-**Photo 2:** Mapillary [1029666137832944](https://www.mapillary.com/app/?pKey=1029666137832944), by mapkin, 2016-08-04 10:44 PDT, CC BY-SA 4.0.
-- It was taken westbound on Sunset from the far (east) side of the intersection, about 50 m out, looking northwest. That's nearly opposite photo 1.
-- The Cafe Tropical facade, sign and awning are on the left, the WOOD bar (2861 Sunset) is on the right, and the intersection overlaps with photo 1.
-- The camera is an iPhone 5s, narrower than photo 1 (about ±31° horizontal), with pitch +8.4°. Camera height is guessed at 1.3 m.
-- It's sunny, where photo 1 is overcast, so the seam between the two photos is visible.
-- How it was chosen: the closest date with a different direction and the cafe in frame. The same-day frames from photo 1's sequence were rejected as too similar.
-- Photos viewed so far: 3 (photo 1, the rejected same-day frame, and photo 2).
-
-**Photo 3:** Mapillary [3898074213645371](https://www.mapillary.com/app/?pKey=3898074213645371), by sarawabreus, 2016-03-25 (iPhone 6s), CC BY-SA 4.0.
-- It was taken on Parkman Avenue, about 225 m southwest of the signal, looking northeast up Parkman toward the intersection (heading 55.7°, pitch +8.1°).
-- Picked by metadata only (nearest date to photos 1 and 2 among those on Parkman) and **not checked in the viewer**, so its pose and the 1.2 m camera height guess are unverified. Photos 1 and 2 face Sunset.
-- It sits at the edge of the model, so little of its view lands on modelled surfaces.
-
-**Photo 4:** Mapillary [1644797915731122](https://www.mapillary.com/app/?pKey=1644797915731122), by mapkin, 2016-08-04 (iPhone 5s, same drive as photo 2).
-- It was taken about 105 m northwest of the signal, looking north-northwest (heading 336°, pitch +9.3°), away from the intersection.
-
-**Photo 5:** Mapillary [1191635439743321](https://www.mapillary.com/app/?pKey=1191635439743321), by inlandurbanist, 2023-06-20 (GoPro Hero 7), heading 310°, pitch +2.2°.
-- It was taken in the middle of the intersection, 3 m from the signal, looking northwest. It's the newest photo, from 7 years after photos 1–4.
-
-Photos 4 and 5 were picked by metadata only and are **not checked in the viewer** (1.2 m camera height guessed). Photos within 120 m of the signal only face two ways along Sunset (about 140° and 310°), so there are few truly different directions beyond photos 3 and 4. `MAXP` is now 10; see the notes under photos 6–10.
-
-**Photos 6–10** (all picked by metadata only and **not checked in the viewer**; 1.2 m camera height guessed). They're spread by position, heading and date:
-- **6:** Mapillary [213480793558423](https://www.mapillary.com/app/?pKey=213480793558423), gyllen, 2016-01-30. Far northwest (about 170 m out), looking southeast toward the intersection.
-- **7:** [2966239396929564](https://www.mapillary.com/app/?pKey=2966239396929564), gyllen, 2016-01-30. Southeast of the intersection (about 165 m out), looking southeast, away from it.
-- **8:** [298764735081568](https://www.mapillary.com/app/?pKey=298764735081568), mapkin, 2016-08-04. Far southeast, looking northwest up Sunset.
-- **9:** [2325730507557302](https://www.mapillary.com/app/?pKey=2325730507557302), mapkin, 2016-08-04. Far northwest, looking north-northwest.
-- **10:** [316723689810082](https://www.mapillary.com/app/?pKey=316723689810082), voschix, 2016-11-04 (Sony Xperia). At the intersection, looking northwest. It's close to photo 5's spot, but a different camera and date.
-
-Within 170 m of the signal, photos only face along Sunset, so these differ mostly in position and date.
-
-**Why 10 is the limit now:** the depth passes for all photos share one atlas (4×4 tiles of 1024 px), so the shader needs one sampler per photo plus one. GPUs guarantee only 16 samplers, so 10 photos leaves room; going beyond about 12 would need a different approach (such as texture arrays).
-
-**How it works**
-- `scripts/photo_to_scene.py ID…` fetches the pose and a 2048 px image into `docs/sunset/photos/` and `data/photos.json`.
-- Pose comes from Mapillary SfM: `computed_rotation` (angle-axis, ENU → camera) and `computed_geometry`. Checks: the forward vector gives heading 144.2°, matching `computed_compass_angle`, with pitch +1.6° and roll −4.3°. The position lands in the rightmost eastbound lane of the model's Sunset, which matches what the photo shows.
-- Camera height is **guessed at 1.2 m** from the lane-line perspective. Mapillary altitude isn't reliable.
-- The Mapillary perspective model is applied in the shader: `st = 0.5 + f·(1 + k1·r² + k2·r⁴)·(x/z, y/z)·max(w,h)/(w,h)`. The flat plane uses the same projection, so it shows the photo undistorted.
-- Occlusion uses a depth pass rendered from each photo camera (shadow-map style), so walls behind other buildings aren't painted. Up to 10 photos share one shader loop (`MAXP`). The guessed signal poles are excluded both as occluders and as receivers.
-- Projected pixels are unlit: they replace the model colour, with a soft fade at the image edges.
-
-**Can a photo cover the surfaces as presented?** From the vantage, yes, it looks right. Moving away shows what a single photo can and can't do:
-- **Works:** surfaces the camera faced, close to the right distance. The road and lane lines, the curb and the storefront walls on the right line up. In the test shots, the Silverlake Lounge facade still reads correctly from well off to one side.
-- **Missing:**
-  - Anything that isn't in the model has nowhere to land: sky, utility poles, the billboard, trees, cars as objects.
-  - Surfaces the photo didn't see stay plain: the backs and sides of buildings, the road behind the camera, and the far side of the street beyond the parked cars.
-- **Smears:**
-  - Surfaces seen at grazing angles stretch into streaks: walls running along the view direction, and the road right in front of the camera.
-  - Cars, poles and palms get flattened onto the road and walls, so they look right only from the vantage.
-  - Where the model's walls are set back from the real facades, or heights are off, content slides.
-  - Things missing from the model (cars, poles) don't stop the rays, so their pixels land on whatever is behind, sometimes a far wall.
-  - With two photos, the intersection road is hit at grazing angles from both sides, so from above it's mostly streaks.
-
-Covering the intersection properly would take **many photos blended per surface**: for each fragment, use the photo that sees it most head-on and closest. Possible sources:
-- The same 2016 sequence has 5 frames from 24 to 66 m out.
-- There are 168 candidate perspective photos facing the intersection.
-- There are 215 panoramas in the focus area. A panorama covers every direction from one point and would cover the most surface per photo, but it needs an equirectangular projection instead of the perspective one used here.
-
-Better geometry (real facade lines, road widths from sidewalks) would reduce the sliding.
+- [ ] Update wrangler (deployed with 3.99.0; 4.x is current).
 
 ## Later (not now)
-- Field photos, beyond the first try above: blend several photos, support panoramas, add KartaView and Panoramax, show vantage markers you can click, and use the photos to check the guesses (lane widths, signal positions, trees).
+- More field photo work is listed in [three-photos.md](three-photos.md), "Ideas".
 - Trees, street lamps and utility poles: map them in OSM from a survey, then they'll show up in the scene automatically.
 - LA City or County curb and sidewalk datasets, if they're better than OSM.

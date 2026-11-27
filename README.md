@@ -17,5 +17,6 @@ Open map data, street-level photos and GPS data for Silver Lake, Los Angeles, st
   - [map/map-osm.md](map/map-osm.md): OpenStreetMap via Overpass
 - 3D
   - [three/three.md](three/three.md): three.js model of the Sunset & Silver Lake intersection
+    - [three/three-photos.md](three/three-photos.md): field photos in the viewer
 - Status
   - [meta/](meta/): daily status logs (latest: [2026-11-27](meta/2026-11-27.md))
