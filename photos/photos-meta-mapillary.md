@@ -13,7 +13,8 @@
 
 ## Silver Lake coverage
 - Not queried yet (no token). Expected to be the densest open source of imagery for LA.
-- TODO: store the token in `.env` (gitignored), then count images and sequences in the bbox `-118.285,34.075,-118.250,34.105`.
+- App ID `29636584962603158` is registered. Credentials live in `.env` (gitignored; the template is `.env.example`).
+- Once `MAPILLARY_ACCESS_TOKEN` is set, run `scripts/mapillary-check.sh` to count images and sequences in the bbox.
 
 ## Pros / cons
 See [photos.md](photos.md#mapillary).
