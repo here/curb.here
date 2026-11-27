@@ -477,7 +477,8 @@ function saveHash() { hashDirty = true; }
 function writeHash() {
   if (!hashDirty) return; hashDirty = false;
   const ph = (photoUI.flat.checked ? "f" : "") + (photoUI.mapped.checked ? "m" : "");
-  const extra = (ph ? `&ph=${ph}` : "") + (street.vantage && mode === "street" ? `&at=${street.vantage.id}` : "");
+  const off = photos.map((P, i) => P.enabled ? "" : i + 1).filter(Boolean).join(",");
+  const extra = (ph ? `&ph=${ph}` : "") + (off ? `&poff=${off}` : "") + (street.vantage && mode === "street" ? `&at=${street.vantage.id}` : "");
   const h = (mode === "street"
     ? `v=street&x=${f1(street.x)}&z=${f1(street.z)}&yaw=${f2(street.yaw)}&pitch=${f2(street.pitch)}`
     : `v=orbit&c=${camera.position.toArray().map(f1)}&t=${orbit.target.toArray().map(f1)}`) + extra;
@@ -489,6 +490,8 @@ function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   const ph = q.get("ph") || "";
   photoUI.flat.checked = ph.includes("f"); photoUI.mapped.checked = ph.includes("m");
+  const off = (q.get("poff") || "").split(",").map(Number);
+  photos.forEach((P, i) => { P.enabled = !off.includes(i + 1); P.checkbox.checked = P.enabled; });
   applyPhotoToggles();
   const at = photos.find((p) => p.id === q.get("at"));
   if (at) return goVantage(at);
@@ -522,7 +525,7 @@ float photoEdge(vec2 st) { return smoothstep(0.0, 0.015, min(min(st.x, 1.0 - st.
 `;
 const blank = new THREE.DataTexture(new Uint8Array(4), 1, 1); blank.needsUpdate = true;
 const photoU = {
-  photoOn: { value: 0 }, photoCount: { value: 0 }, depthNF: { value: new THREE.Vector2(0.5, 800) },
+  photoOn: { value: 0 }, photoCount: { value: 0 }, photoEnabled: { value: Array(MAXP).fill(1) }, depthNF: { value: new THREE.Vector2(0.5, 800) },
   photoTex: { value: Array(MAXP).fill(blank) }, photoDepth: { value: Array(MAXP).fill(blank) },
   photoView: { value: Array.from({ length: MAXP }, () => new THREE.Matrix4()) },
   photoDepthMat: { value: Array.from({ length: MAXP }, () => new THREE.Matrix4()) },
@@ -539,7 +542,7 @@ function patchMaterial(mat) {
       .replace("#include <project_vertex>", "#include <project_vertex>\nvPhotoW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", `#include <common>
-varying vec3 vPhotoW; uniform float photoOn; uniform int photoCount; uniform vec2 depthNF;
+varying vec3 vPhotoW; uniform float photoOn; uniform int photoCount; uniform vec2 depthNF; uniform float photoEnabled[${MAXP}];
 uniform sampler2D photoTex[${MAXP}]; uniform sampler2D photoDepth[${MAXP}];
 uniform mat4 photoView[${MAXP}]; uniform mat4 photoDepthMat[${MAXP}];
 uniform vec3 photoK[${MAXP}]; uniform vec2 photoScale[${MAXP}];
@@ -558,7 +561,7 @@ if (photoOn > 0.5) {
   bool photoDone = false;
   #pragma unroll_loop_start
   for ( int i = 0; i < ${MAXP}; i ++ ) {
-    if (!photoDone && UNROLLED_LOOP_INDEX < photoCount) {
+    if (!photoDone && UNROLLED_LOOP_INDEX < photoCount && photoEnabled[ i ] > 0.5) {
       vec2 st = photoST(vPhotoW, photoView[ i ], photoK[ i ], photoScale[ i ]);
       float a = photoEdge(st);
       if (a > 0.0) a *= photoVisible(vPhotoW, photoDepthMat[ i ], photoDepth[ i ]);
@@ -571,7 +574,7 @@ if (photoOn > 0.5) {
   #pragma unroll_loop_end
 }`);
   };
-  mat.customProgramCacheKey = () => "photo-v2";
+  mat.customProgramCacheKey = () => "photo-v3";
   mat.needsUpdate = true;
 }
 
@@ -650,7 +653,11 @@ function buildFlat(P) {
   lines.renderOrder = 998;
   const dot = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff7a00 }));
   dot.position.copy(P.C);
-  g0.add(plane, lines, dot);
+  const tag = document.createElement("div");
+  tag.className = "label"; tag.textContent = String(P.n);
+  Object.assign(tag.style, { color: "#fff", background: "#ff7a00", padding: "1px 6px", borderRadius: "9px" });
+  const tagObj = new CSS2DObject(tag); tagObj.position.copy(P.C).add(new THREE.Vector3(0, 1.2, 0));
+  g0.add(plane, lines, dot, tagObj);
   scene.add(g0);
   P.flat = g0;
 }
@@ -660,7 +667,10 @@ function goVantage(P) {
 }
 
 function applyPhotoToggles() {
-  for (const P of photos) P.flat.visible = photoUI.flat.checked;
+  photos.forEach((P, i) => {
+    P.flat.visible = photoUI.flat.checked && P.enabled;
+    photoU.photoEnabled.value[i] = P.enabled ? 1 : 0;
+  });
   photoU.photoOn.value = photoUI.mapped.checked ? 1 : 0;
   updatePhotoInfo(true);
   saveHash();
@@ -678,7 +688,7 @@ function updatePhotoInfo(force = false) {
   const on = photoUI.flat.checked || photoUI.mapped.checked;
   camera.updateMatrixWorld();
   frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-  const seen = on ? photos.filter((P) => P.probes.some((p) => frustum.containsPoint(p))) : [];
+  const seen = on ? photos.filter((P) => P.enabled && P.probes.some((p) => frustum.containsPoint(p))) : [];
   const key = on + seen.map((P) => P.id).join();
   if (!force && key === lastKey) return;
   lastKey = key;
@@ -705,6 +715,7 @@ async function setupPhotos() {
     P.texture.colorSpace = THREE.SRGBColorSpace;
     P.texture.anisotropy = 8;
     photoSetup(P);
+    P.n = photos.length + 1; P.enabled = true;
     photos.push(P);
   }
   if (!photos.length) return;
@@ -728,6 +739,17 @@ async function setupPhotos() {
     $("preset").add(new Option(label, presets.length - 1));
   }
   photoUI.flat.onchange = photoUI.mapped.onchange = applyPhotoToggles;
+  // numbered per-photo checkboxes; the number is also the precedence order (1 wins)
+  const box = $("photo-list");
+  photos.forEach((P) => {
+    const l = document.createElement("label"), c = document.createElement("input");
+    c.type = "checkbox"; c.checked = true;
+    c.onchange = () => { P.enabled = c.checked; applyPhotoToggles(); };
+    l.title = `Photo ${P.n}: ${P.creator}, ${timeFmt.format(P.captured_at)}`;
+    l.append(c, String(P.n));
+    box.append(l);
+    P.checkbox = c;
+  });
   $("photo-toggles").hidden = false;
 }
 
