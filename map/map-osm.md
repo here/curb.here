@@ -6,9 +6,9 @@ OSM is open map data (ODbL 1.0). Overpass is a read-only query API for OSM data.
 | Priority | Endpoint | Status from roady, 2026-11-27 |
 |---|---|---|
 | 1. Primary | `https://api.overpass.ch/v1/$OVERPASS_CH_API_KEY/interpreter` | **Works, and fast.** A 100 m amenity query took 0.9 s on 2026-11-27 (overpass-api.de took ~37 s for the same query). The key is in `.env` (`OVERPASS_CH_API_KEY`). |
-| 2. Fallback | https://overpass.private.coffee/api/interpreter | **Times out (looks overloaded).** The home page loads, but `/api/interpreter` and `/api/status` hang. |
-| 3. Fallback | https://overpass-api.de/api/interpreter | **Often overloaded.** One query worked in about 37 s; others timed out. Without a `User-Agent` it returns **406 Not Acceptable**. |
-| 4. Last resort | https://nextgis.com/ | Site is up (HTTP 200). This isn't an Overpass interpreter URL: NextGIS offers OSM data extracts and a web GIS, so use it only if both Overpass servers fail. |
+| 2. Fallback | `https://overpass.nextgis.com/$NEXTGIS_OVERPASS_KEY/api/interpreter` | **Keyed, not yet tested.** The key is in `.env` (`NEXTGIS_OVERPASS_KEY`). The bare host returns 301. The `/api/interpreter` suffix is a guess: if it's wrong, set the full URL in `NEXTGIS_OVERPASS_URL` (in `.env` only). |
+| 3. Fallback | https://overpass.private.coffee/api/interpreter | **Times out (looks overloaded).** The home page loads, but `/api/interpreter` and `/api/status` hang. |
+| 4. Fallback | https://overpass-api.de/api/interpreter | **Often overloaded.** One query worked in about 37 s; others timed out. Without a `User-Agent` it returns **406 Not Acceptable**. |
 
 ## overpass.ch
 - Site: https://overpass.ch. It covers Overpass, plus map tiles, geocoding and elevation.
@@ -26,7 +26,8 @@ OSM is open map data (ODbL 1.0). Overpass is a read-only query API for OSM data.
   Don't add it to a committed `.mcp.json`.
 
 ## Usage notes
-- Use `scripts/overpass.sh 'QUERY'`. It tries the endpoints in priority order and never prints the key.
+- Use `scripts/overpass.sh 'QUERY'`. It tries the endpoints in priority order and never prints the keys.
+- The NextGIS key is also in the URL path, so the overpass.ch rules apply: never commit, log or paste the full URL.
 - Always send a generic `User-Agent` (e.g. `curb.here-research`). Don't send personal details.
 - Use `[timeout:N]` and a global `[bbox:S,W,N,E]` to keep queries small. Note that Overpass bbox order is **lat,lon** (south, west, north, east).
 - Set a long client timeout (60–120 s), and on a timeout move down the endpoint list.
