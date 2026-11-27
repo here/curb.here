@@ -375,7 +375,7 @@ function setMode(m, opts = {}) {
     } else Object.assign(street, { pitch: 0, vantage: null, ...opts });
     camera.fov = street.vantage?.fov ?? FOV; camera.updateProjectionMatrix();
   } else if (opts.pos) {
-    street.vantage = null; camera.fov = FOV; camera.updateProjectionMatrix();
+    street.vantage = null; camera.fov = opts.fov ?? FOV; camera.updateProjectionMatrix();
     camera.position.set(...opts.pos); orbit.target.set(...opts.target);
   } else {
     street.vantage = null; camera.fov = FOV; camera.updateProjectionMatrix();
@@ -512,6 +512,10 @@ function setControls(show) {
   $("ui-toggle").setAttribute("aria-pressed", String(show));
   $("ui-toggle").textContent = show ? "Hide buttons" : "Show buttons";
 }
+// Reset: clear the saved view (URL hash) and reload from a fresh URL, so defaults apply and
+// the browser refetches index.html and, through its new ?v=, everything else.
+$("reset").onclick = () => location.replace(location.pathname + "?r=" + Date.now());
+if (new URL(location.href).searchParams.has("r")) history.replaceState(null, "", location.pathname + location.hash); // tidy the URL
 $("ui-toggle").onclick = () => { setControls($("controls").hidden); saveHash(); };
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
@@ -522,7 +526,7 @@ function readHash() {
   photos.forEach((P, i) => { P.enabled = !off.includes(i + 1); P.checkbox.checked = P.enabled; });
   applyPhotoToggles();
   const at = photos.find((p) => p.id === q.get("at"));
-  if (at && !TOUCH) return goVantage(at);
+  if (at) return goVantage(at);
   if (q.get("v") === "street" && !TOUCH)
     return setMode("street", { x: +q.get("x") || 0, z: +q.get("z") || 0, yaw: +q.get("yaw") || 0, pitch: +q.get("pitch") || 0 });
   const c = q.get("c")?.split(",").map(Number), t = q.get("t")?.split(",").map(Number);
@@ -699,7 +703,10 @@ function buildFlat(P) {
 }
 
 function goVantage(P) {
-  if (TOUCH) return;
+  if (TOUCH) {   // no street view here: stand the orbit camera at the photo, looking where it looked
+    const t = P.C.clone().addScaledVector(P.fwd, 10);
+    return setMode("orbit", { pos: P.C.toArray(), target: t.toArray(), fov: P.vfov });
+  }
   setMode("street", { x: P.p[0], z: P.p[1], vantage: { id: P.id, eye: P.h, quat: P.quat, fov: P.vfov } });
 }
 
@@ -772,7 +779,6 @@ async function setupPhotos() {
   for (const P of photos) {
     buildFlat(P);
     const label = `Photo vantage ${new Date(P.captured_at).toISOString().slice(0, 10)}`;
-    if (TOUCH) continue;                  // vantages are street-view poses
     presets.push({ name: label, photo: P });
     $("preset").add(new Option(label, presets.length - 1));
   }

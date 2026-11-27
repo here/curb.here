@@ -94,7 +94,7 @@ There are two modes, toggled by a button and the `V` key:
    - Drag to look around, using `PointerLockControls` or a simple yaw/pitch drag handler. Drag is friendlier than pointer lock on trackpads and phones.
    - Move with WASD or the arrow keys, keep the camera clamped to the terrain height, and double-click to jump to a point on the ground (raycast).
    - Preset spots: the four corners, the Cafe Tropical door and the bridge.
-- Phones and tablets (`pointer: coarse`): orbit view only, using `OrbitControls`' touch handling (drag, two-finger pan, pinch). Street view is off until it has a walk control; see Steps.
+- Phones and tablets (`pointer: coarse`): orbit view only, using `OrbitControls`' touch handling (drag, two-finger pan, pinch). Street view is off until it has a walk control; see Steps. The photo vantage presets still work there: they put the orbit camera at the photo's position and field of view, looking where it looked (you can then orbit from there).
 - Keyboard (built 2026-11-27):
   - Street view: W/S (or ↑/↓) walk at 8 m/s, or 28 m/s with Left Shift. A/D (or ←/→) **turn**; hold Right Shift or `/` to strafe instead. Space jumps (about 3 m up, then back to the ground).
   - Orbit: WASD or the arrow keys move over the ground (speed scales with zoom), Q/E rotate around the target, R/F tilt, and +/− or PgUp/PgDn zoom. Left Shift is 3× faster.
@@ -184,7 +184,7 @@ To view locally, run `python3 -m http.server -d docs 8000` and open http://local
 - [ ] Junction areas: lane lines stop 7 m short of each way's end, and the junction box isn't drawn as its own surface yet.
 - [ ] Road widths from the gap between the mapped sidewalks, instead of lane counts.
 - [ ] Turn arrows from `turn:lanes:*`.
-- [ ] **TODO: street-view walk mode for touchscreens.** Street view (and the photo vantage presets) is disabled on touch devices because there's no way to walk. It needs on-screen controls: a virtual joystick or drag-to-walk, plus a jump button.
+- [ ] **TODO: street-view walk mode for touchscreens.** Street view is disabled on touch devices because there's no way to walk. It needs on-screen controls: a virtual joystick or drag-to-walk, plus a jump button.
 - [ ] Hide far labels. CSS labels show through buildings.
 - [ ] Find out what passes under the Sunset bridge (way 30528196) and fix the bridge model.
 - [ ] Better ground: USGS 3DEP 1 m DTM instead of building `ele`.
@@ -195,6 +195,8 @@ The viewer has two checkboxes, "Photos flat" and "Photos mapped", shown when `do
 - **Field photos mapped:** the photo is projected onto the model's surfaces: terrain, roads, sidewalks, curbs and buildings.
 
 Where photos overlap, **the first photo in `photos.json` that sees a surface wins**. There's no blending, and order is sequential: photo 1, then photo 2. A pill under the toolbar shows **"Photos in view"**: the capture-time range (LA time) of the shown photos whose coverage is on screen, tested by probing points along each photo's frustum. The credits line lists the same photos.
+
+**Reset button** (circular-arrow icon before "Show buttons"): drops the saved view and reloads from a fresh `?r=` URL, so everything returns to the defaults below and the browser refetches the page and, through its new `?v=`, the scripts, data and photos. The `?r=` is removed from the address bar after loading.
 
 **Defaults:** the buttons are hidden (use "Show buttons" next to the title; `ui=1` in the URL keeps them showing), photos are shown flat, not mapped, and all 10 are on. A link with `ph=` in it overrides this (`ph=` alone means both off).
 
