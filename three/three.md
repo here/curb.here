@@ -163,7 +163,7 @@ To view locally, run `python3 -m http.server -d docs 8000` and open http://local
 - [x] `docs/sunset/`: terrain, buildings, roads with lane lines, sidewalks with curb faces, crosswalks, guessed signal poles, labels and shadows.
 - [x] Orbit and street-view modes, presets (overview, four corners, Cafe Tropical, the bridge) and shareable URL-hash views.
 - [x] Worker code tested locally.
-- [ ] Deploy the Worker (waiting on a Cloudflare API token and curb.here as a Cloudflare zone). Then confirm `https://curb.here/sunset/` loads.
+- [x] Deploy the Worker. `https://curb.here/sunset/` loads (2026-11-27).
 - [ ] Curb ramps at `kerb=lowered` nodes. Today only tactile pads are drawn, and the sidewalk slab is raised everywhere.
 - [ ] Junction areas: lane lines stop 7 m short of each way's end, and the junction box isn't drawn as its own surface yet.
 - [ ] Road widths from the gap between the mapped sidewalks, instead of lane counts.
