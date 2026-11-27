@@ -19,7 +19,7 @@ Checked on 2026-11-27.
 | Mastodon / Bluesky | Public | Photos, video in posts | Copyright stays with the poster; no default license | Free API | Not explored — posts are rarely geotagged |
 | Google Street View | Public, paid | Street-level 360° | Proprietary; display only, no storing or derived data | Pay-per-request after a monthly free credit | Not explored — coverage is dense |
 | Waymo fleet | Private | Camera + lidar | Proprietary | Not for sale | Not explored |
-| Waymo Open Dataset | Public | Camera + lidar segments | Non-commercial license | Free, registration required | Not explored — check whether LA is included |
+| [Waymo Open Dataset](photos-waymo-open-dataset.md) | Public | 20 s camera + lidar segments | Non-commercial; images only as small extracts in research publications | Free, Google sign-in | Can't be located (no lat/lon); LA confirmed only in the Motion dataset, which has no images |
 | LADOT / StreetsLA | Private (Public Records Act request) | Traffic cameras (ATSAC), pavement-survey imagery | Government record | Free or copy fees | Not explored |
 
 ## Public
@@ -56,8 +56,10 @@ Dense, regularly updated 360° coverage of Sunset Blvd, including historical ima
 The Static and Metadata APIs are pay-per-request after a monthly free credit. The terms forbid storing images or deriving map data from them, so it's useful for viewing only. Not explored yet.
 
 ### Waymo Open Dataset
-Waymo's research release of camera and lidar segments. It's free under a non-commercial license and requires registration.
-Check whether any LA segments exist before relying on it. Not explored yet.
+Waymo's free research release, in three parts: Perception (2,030 segments with camera and lidar), Motion (103k segments with no images) and End-to-End (5,000 segments with 360° cameras).
+The license is non-commercial, and images may only be published as small extracts in research papers.
+Segments have no latitude/longitude, only a city code, so there's no way to find the focus area. LA is confirmed only in Motion.
+→ [photos-waymo-open-dataset.md](photos-waymo-open-dataset.md)
 
 ## Private
 
