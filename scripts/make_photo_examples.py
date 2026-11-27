@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build photos/examples.md: up to 10 sample images per service near Cafe Tropical.
+"""Build data/photos/examples.md: up to 10 sample images per service near Cafe Tropical.
 
 - Mapillary thumbnail URLs are signed and expire, so thumbnails are downloaded into
-  photos/examples/mapillary/ (CC-BY-SA 4.0, attributed in the doc).
+  data/photos/examples/mapillary/ (CC-BY-SA 4.0, attributed in the doc).
 - KartaView (cdn.kartaview.org) and Panoramax URLs are stable public links, so they are hotlinked.
 
 Usage: python3 -I scripts/make_photo_examples.py
@@ -11,8 +11,8 @@ import base64, collections, datetime as dt, json, math, os, urllib.parse, urllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT_MD = ROOT / "photos" / "examples.md"
-MLY_DIR = ROOT / "photos" / "examples" / "mapillary"
+OUT_MD = ROOT / "data" / "photos" / "examples.md"
+MLY_DIR = ROOT / "data" / "photos" / "examples" / "mapillary"
 CAFE = (34.0829003, -118.2735534)          # lat, lon — Cafe Tropical, 2900 W Sunset Blvd
 FOCUS = (-118.2757, 34.0811, -118.2714, 34.0847)
 NEAR = (-118.2745, 34.0822, -118.2726, 34.0836)   # tighter box for Mapillary (API rejects big responses)

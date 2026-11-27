@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run an Overpass QL query, trying endpoints in priority order (see map/map-osm.md).
+# Run an Overpass QL query, trying endpoints in priority order (see data/map/map-osm.md).
 # Usage: scripts/overpass.sh 'QUERY' > out.json     or     scripts/overpass.sh < query.overpassql
 # Reads OVERPASS_CH_API_KEY and NEXTGIS_OVERPASS_KEY from .env. Never prints the keys.
 set -uo pipefail

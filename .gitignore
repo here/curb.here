@@ -2,5 +2,5 @@
 .env.*
 !.env.example
 .kartaview_login_state
-photos/cache/
+data/photos/cache/
 three/cache/

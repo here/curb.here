@@ -24,7 +24,7 @@
   - [data/mapillary-focus-images.geojson](data/mapillary-focus-images.geojson): 1,499 points with id, capture time, heading, pano flag, sequence, creator and viewer link.
     That's 16 fewer than 1,515 because the script uses the corrected (`computed_geometry`) positions, and 16 of those fall outside the bbox.
   - [data/mapillary-focus-tracks.geojson](data/mapillary-focus-tracks.geojson): 21 lines, one per sequence, clipped to the bbox and ordered by capture time.
-  - `--thumbs` saves 256px thumbnails to `photos/cache/mapillary/` (1,515 files, 15 MB, gitignored).
+  - `--thumbs` saves 256px thumbnails to `data/photos/cache/mapillary/` (1,515 files, 15 MB, gitignored).
 - Who captured what: 14 of 21 sequences (1,089 images) come from `lvl5` (2018-08 to 2019-03, dashcam-style); `gyllen` took 2016 and 2022 panoramas.
   The newest are from `nthp_gis` (2026-06-06, 149 panoramas) and `inlandurbanist` (2023-06-20, 114).
 

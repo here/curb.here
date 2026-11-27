@@ -6,17 +6,19 @@ Open map data, street-level photos and GPS data for Silver Lake, Los Angeles, st
 - [project.md](project.md): goal, focus area, workstreams
 - [plan/plan.md](plan/plan.md): plan, active and deferred workstreams
 - [AGENTS.md](AGENTS.md): working rules for agents
+- Location
+  - [data/location.md](data/location.md): data sources for mobile object locations and linestrings
 - Photos
-  - [photos/photos.md](photos/photos.md): comparison of street-level photo services
-  - [photos/photos-meta-mapillary.md](photos/photos-meta-mapillary.md): Mapillary
-  - [photos/photos-kartaview.md](photos/photos-kartaview.md): KartaView
-  - [photos/photos-panoramax.md](photos/photos-panoramax.md): Panoramax
-  - [photos/examples.md](photos/examples.md): example photos near Cafe Tropical
-  - [Mapillary images (map)](photos/data/mapillary-focus-images.geojson) · [Mapillary tracks (map)](photos/data/mapillary-focus-tracks.geojson)
+  - [data/photos/photos.md](data/photos/photos.md): comparison of street-level photo services
+  - [data/photos/photos-meta-mapillary.md](data/photos/photos-meta-mapillary.md): Mapillary
+  - [data/photos/photos-kartaview.md](data/photos/photos-kartaview.md): KartaView
+  - [data/photos/photos-panoramax.md](data/photos/photos-panoramax.md): Panoramax
+  - [data/photos/examples.md](data/photos/examples.md): example photos near Cafe Tropical
+  - [Mapillary images (map)](data/photos/data/mapillary-focus-images.geojson) · [Mapillary tracks (map)](data/photos/data/mapillary-focus-tracks.geojson)
 - Map
-  - [map/map-osm.md](map/map-osm.md): OpenStreetMap via Overpass
+  - [data/map/map-osm.md](data/map/map-osm.md): OpenStreetMap via Overpass
 - Curb data
-  - [curb/curb.md](curb/curb.md): curb data specs (CDS, MDS) and providers
+  - [data/curb/curb.md](data/curb/curb.md): curb data specs (CDS, MDS) and providers
 - 3D
   - [three/three.md](three/three.md): three.js model of the Sunset & Silver Lake intersection
     - [three/three-photos.md](three/three-photos.md): field photos in the viewer

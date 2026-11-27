@@ -3,9 +3,9 @@
 
 Usage: scripts/mapillary_pull.py [minlon,minlat,maxlon,maxlat] [--thumbs]
 Default bbox is the focus area (project.md). Writes:
-  photos/data/mapillary-focus-images.geojson   one Point per image
-  photos/data/mapillary-focus-tracks.geojson   one LineString per sequence (in-bbox part, by capture time)
-  photos/cache/mapillary/<id>.jpg              256px thumbnails with --thumbs (gitignored)
+  data/photos/data/mapillary-focus-images.geojson   one Point per image
+  data/photos/data/mapillary-focus-tracks.geojson   one LineString per sequence (in-bbox part, by capture time)
+  data/photos/cache/mapillary/<id>.jpg              256px thumbnails with --thumbs (gitignored)
 Reads MAPILLARY_ACCESS_TOKEN from the environment or ../.env.
 """
 import collections, datetime, json, os, sys, urllib.parse, urllib.request
@@ -87,13 +87,13 @@ def main():
                                       "start": pts[0][2]["captured_at"], "end": pts[-1][2]["captured_at"],
                                       "is_pano": pts[0][2]["is_pano"], "creator": pts[0][2]["creator"]}})
     tracks.sort(key=lambda t: t["properties"]["start"] or "")
-    outdir = ROOT / "photos/data"; outdir.mkdir(parents=True, exist_ok=True)
+    outdir = ROOT / "data/photos/data"; outdir.mkdir(parents=True, exist_ok=True)
     for name, fs in (("images", feats), ("tracks", tracks)):
         p = outdir / f"mapillary-focus-{name}.geojson"
         p.write_text(json.dumps({"type": "FeatureCollection", "features": fs}, separators=(",", ":")) + "\n")
         print(f"wrote {p.relative_to(ROOT)} ({len(fs)} features)")
     if "--thumbs" in sys.argv:
-        cache = ROOT / "photos/cache/mapillary"; cache.mkdir(parents=True, exist_ok=True)
+        cache = ROOT / "data/photos/cache/mapillary"; cache.mkdir(parents=True, exist_ok=True)
         todo = [(i["id"], i["thumb_256_url"]) for i in imgs.values()
                 if i.get("thumb_256_url") and not (cache / f"{i['id']}.jpg").exists()]
         def get(t):

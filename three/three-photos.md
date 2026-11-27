@@ -34,7 +34,7 @@ All were picked by metadata (non-panoramic, near the intersection, spread by pos
 - Photos viewed while choosing: photo 1, one same-day frame rejected as too similar to photo 1, and photo 2. The two checked photos were the only ones loaded in the viewer at the time.
 
 ## Adding a photo
-1. Pick one by metadata from `photos/data/mapillary-focus-images.geojson` (perspective camera, not a panorama).
+1. Pick one by metadata from `data/photos/data/mapillary-focus-images.geojson` (perspective camera, not a panorama).
 2. Run `scripts/photo_to_scene.py ID… [--height M]`. It writes the 2048 px image to `docs/sunset/photos/` and the pose to `docs/sunset/data/photos.json`, then re-stamps `index.html` (see Cache-busting in [three.md](three.md)).
 3. Add a row above, commit, push. Don't render or verify it unless asked.
 4. The limit is `MAXP = 10` in `main.js` (see below).

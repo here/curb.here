@@ -64,5 +64,5 @@ Bbox `34.0811,-118.2757,34.0847,-118.2714` (Overpass order), about 200 m around 
 ## TODO
 - [x] NextGIS key in `.env` and interpreter tested on roady, 2026-11-27. `scripts/overpass.sh` falls back to it when overpass.ch is unavailable.
 - [x] overpass.ch key in `.env`, interpreter tested, and MCP server `overpass` registered in local scope (connected) on roady, 2026-11-27.
-- [ ] Save focus-area extracts as GeoJSON in `map/data/` (crossings, signals, curbs and sidewalks for "curb.here").
+- [ ] Save focus-area extracts as GeoJSON in `data/map/data/` (crossings, signals, curbs and sidewalks for "curb.here").
 - [ ] Look into curb-related tags: `kerb=*`, `sidewalk=*`, `parking:lane:*` / `parking:*`, `crossing=*`.
