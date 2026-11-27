@@ -5,7 +5,7 @@ OSM is open map data (ODbL 1.0). Overpass is a read-only query API for OSM data.
 ## Endpoints (try in this order)
 | Priority | Endpoint | Status from roady, 2026-11-27 |
 |---|---|---|
-| 1. Primary | `https://api.overpass.ch/v1/$OVERPASS_CH_API_KEY/interpreter` | Paid/keyed service. The key is in `.env` (`OVERPASS_CH_API_KEY`). Not tested yet. |
+| 1. Primary | `https://api.overpass.ch/v1/$OVERPASS_CH_API_KEY/interpreter` | **Works, and fast.** A 100 m amenity query took 0.9 s on 2026-11-27 (overpass-api.de took ~37 s for the same query). The key is in `.env` (`OVERPASS_CH_API_KEY`). |
 | 2. Fallback | https://overpass.private.coffee/api/interpreter | **Times out (looks overloaded).** The home page loads, but `/api/interpreter` and `/api/status` hang. |
 | 3. Fallback | https://overpass-api.de/api/interpreter | **Often overloaded.** One query worked in about 37 s; others timed out. Without a `User-Agent` it returns **406 Not Acceptable**. |
 | 4. Last resort | https://nextgis.com/ | Site is up (HTTP 200). This isn't an Overpass interpreter URL: NextGIS offers OSM data extracts and a web GIS, so use it only if both Overpass servers fail. |
@@ -61,6 +61,6 @@ Bbox `34.0811,-118.2757,34.0847,-118.2714` (Overpass order), about 200 m around 
   N Reno St, N Vendome St, Reservoir St, Westerly Ter.
 
 ## TODO
-- [ ] Add the overpass.ch key to `.env`, test the interpreter and register the MCP server (local scope).
+- [x] overpass.ch key in `.env`, interpreter tested, and MCP server `overpass` registered in local scope (connected) on roady, 2026-11-27.
 - [ ] Save focus-area extracts as GeoJSON in `map/data/` (crossings, signals, curbs and sidewalks for "curb.here").
 - [ ] Look into curb-related tags: `kerb=*`, `sidewalk=*`, `parking:lane:*` / `parking:*`, `crossing=*`.
