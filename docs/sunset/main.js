@@ -6,7 +6,8 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const SINK = 0.25; // terrain mesh drawn this far below the sampled ground
-const EYE = 1.6, CURB = 0.15, WALK = 4, RUN = 14;
+const EYE = 1.6, CURB = 0.15, WALK = 8, RUN = 28;     // street-view speeds, m/s
+const JUMP_V = 4.5, GRAVITY = 9.8;                    // Space: ~1 m hop
 const LIFT = { service: 0.02, residential: 0.03, unclassified: 0.03, living_street: 0.03,
                tertiary: 0.035, secondary: 0.04, primary: 0.05 };
 const COLORS = {
@@ -339,16 +340,14 @@ function label(text, x, z, cls, dy = 4) {
 
 // ---- controls ---------------------------------------------------------------------------
 let mode = "orbit";
-const street = { x: 0, z: 0, yaw: 0, pitch: 0, vantage: null }; // vantage: {eye, quat, fov} from a photo
+const street = { x: 0, z: 0, yaw: 0, pitch: 0, vantage: null, jumpY: 0, vy: 0 }; // vantage: {eye, quat, fov} from a photo
 const FOV = 60;
-function leaveVantage(keepLook) {
+function leaveVantage(keepFov) {
   const v = street.vantage; if (!v) return;
-  if (keepLook) { // carry the photo's look direction into yaw/pitch (roll is dropped)
-    const e = new THREE.Euler().setFromQuaternion(v.quat, "YXZ");
-    street.yaw = e.y; street.pitch = -e.x;
-  }
+  const e = new THREE.Euler().setFromQuaternion(v.quat, "YXZ"); // carry the photo's look (roll dropped)
+  street.yaw = e.y; street.pitch = -e.x;
   street.vantage = null;
-  if (!keepLook) { camera.fov = FOV; camera.updateProjectionMatrix(); }
+  if (!keepFov) { camera.fov = FOV; camera.updateProjectionMatrix(); }
 }
 const keys = new Set();
 
@@ -358,8 +357,8 @@ function setMode(m, opts = {}) {
   $("mode").setAttribute("aria-pressed", String(m === "street"));
   $("mode").textContent = m === "street" ? "Orbit view" : "Street view";
   $("help").textContent = m === "street"
-    ? "Drag to look around · WASD / arrows to walk (Shift = faster) · double-click ground to jump · V for orbit"
-    : "Drag to rotate · right-drag to pan · scroll to zoom · double-click to focus · V for street view";
+    ? "Drag to look around · WASD / arrows to walk (Shift = faster) · Space to jump · double-click ground to go there · V for orbit"
+    : "Drag to rotate · right-drag to pan · scroll to zoom · WASD / arrows to move · Q/E rotate · R/F tilt · +/− or PgUp/PgDn zoom (Shift = faster) · V for street view";
   if (m === "street") {
     if (opts.x === undefined) {
       const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
@@ -388,6 +387,11 @@ $("preset").onchange = (e) => {
 addEventListener("keydown", (e) => {
   if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
   if (e.key === "v" || e.key === "V") return setMode(mode === "orbit" ? "street" : "orbit");
+  if (e.code === "Space") {        // don't scroll or click a focused button
+    e.preventDefault(); document.activeElement?.blur?.();
+    if (mode === "street" && street.jumpY === 0) street.vy = JUMP_V;
+  }
+  if (e.code.startsWith("Arrow") || e.code === "PageUp" || e.code === "PageDown") e.preventDefault();
   keys.add(e.code); if (e.shiftKey) keys.add("Shift");
 });
 addEventListener("keyup", (e) => { keys.delete(e.code); if (!e.shiftKey) keys.delete("Shift"); });
@@ -430,10 +434,40 @@ function updateStreet(dt) {
     street.z += (-Math.cos(street.yaw) * fwd - Math.sin(street.yaw) * side) * sp;
     hashDirty = true;
   }
+  if (street.vy || street.jumpY) {  // jump: rise, then fall back to the ground
+    street.vy -= GRAVITY * dt; street.jumpY += street.vy * dt;
+    if (street.jumpY <= 0) { street.jumpY = 0; street.vy = 0; }
+  }
   const v = street.vantage;
-  camera.position.set(street.x, ground(street.x, street.z) + (v ? v.eye : CURB + EYE), street.z);
+  camera.position.set(street.x, ground(street.x, street.z) + (v ? v.eye : CURB + EYE) + street.jumpY, street.z);
   if (v) { camera.quaternion.copy(v.quat); return; }
   camera.rotation.set(-street.pitch, street.yaw, 0, "YXZ");
+}
+
+// Orbit keyboard: WASD/arrows move over the ground, Q/E rotate, R/F tilt, +/- and PgUp/PgDn zoom.
+const _off = new THREE.Vector3(), _sph = new THREE.Spherical(), _fwd = new THREE.Vector3(), _rt = new THREE.Vector3();
+function updateOrbitKeys(dt) {
+  const k = (...c) => c.some((x) => keys.has(x)) ? 1 : 0;
+  const fwd = k("KeyW", "ArrowUp") - k("KeyS", "ArrowDown"), side = k("KeyD", "ArrowRight") - k("KeyA", "ArrowLeft");
+  const rot = k("KeyE") - k("KeyQ"), tilt = k("KeyF") - k("KeyR");
+  const zoom = k("Equal", "NumpadAdd", "PageUp") - k("Minus", "NumpadSubtract", "PageDown");
+  if (!(fwd || side || rot || tilt || zoom)) return;
+  const fast = keys.has("Shift") ? 3 : 1;
+  _off.subVectors(camera.position, orbit.target);
+  if (fwd || side) {
+    const speed = Math.max(10, _off.length() * 0.8) * fast * dt;
+    camera.getWorldDirection(_fwd); _fwd.y = 0; _fwd.normalize();
+    _rt.set(-_fwd.z, 0, _fwd.x);
+    const move = _fwd.multiplyScalar(fwd * speed).addScaledVector(_rt, side * speed);
+    orbit.target.add(move);
+  }
+  _sph.setFromVector3(_off);
+  _sph.theta -= rot * 1.2 * fast * dt;
+  _sph.phi = THREE.MathUtils.clamp(_sph.phi + tilt * 0.8 * fast * dt, 0.05, orbit.maxPolarAngle);
+  _sph.radius = THREE.MathUtils.clamp(_sph.radius * Math.exp(-zoom * 1.5 * fast * dt), orbit.minDistance, orbit.maxDistance);
+  camera.position.copy(orbit.target).add(_off.setFromSpherical(_sph));
+  camera.lookAt(orbit.target);
+  hashDirty = true;
 }
 
 // ---- URL hash: #v=street&x=..&z=..&yaw=..&pitch=..  or  #v=orbit&c=x,y,z&t=x,y,z ---------
@@ -712,7 +746,7 @@ readHash();
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (mode === "street") updateStreet(dt); else orbit.update();
+  if (mode === "street") updateStreet(dt); else { updateOrbitKeys(dt); orbit.update(); }
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
   updatePhotoInfo();
