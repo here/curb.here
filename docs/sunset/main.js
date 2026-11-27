@@ -7,7 +7,8 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const SINK = 0.25; // terrain mesh drawn this far below the sampled ground
 const EYE = 1.6, CURB = 0.15, WALK = 8, RUN = 28;     // street-view speeds, m/s
-const JUMP_V = 4.5, GRAVITY = 9.8;                    // Space: ~1 m hop
+const JUMP_V = 7.8, GRAVITY = 9.8;                    // Space: ~3 m hop (height = v²/2g)
+const TURN = 1.8;                                     // A/D turn rate in street view, rad/s
 const LIFT = { service: 0.02, residential: 0.03, unclassified: 0.03, living_street: 0.03,
                tertiary: 0.035, secondary: 0.04, primary: 0.05 };
 const COLORS = {
@@ -360,8 +361,8 @@ function setMode(m, opts = {}) {
   $("mode").setAttribute("aria-pressed", String(m === "street"));
   $("mode").textContent = m === "street" ? "Orbit view" : "Street view";
   $("help").textContent = m === "street"
-    ? "Drag to look around · WASD / arrows to walk (Shift = faster) · Space to jump · double-click ground to go there · V for orbit"
-    : "Drag to rotate · right-drag to pan · scroll to zoom · WASD / arrows to move · Q/E rotate · R/F tilt · +/− or PgUp/PgDn zoom (Shift = faster) · V for street view";
+    ? "Drag to look around · W/S walk · A/D turn (hold Right Shift or / to strafe) · Left Shift = faster · Space to jump · double-click ground to go there · V for orbit"
+    : "Drag to rotate · right-drag to pan · scroll to zoom · WASD / arrows to move · Q/E rotate · R/F tilt · +/− or PgUp/PgDn zoom (Left Shift = faster) · V for street view";
   if (m === "street") {
     if (opts.x === undefined) {
       const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
@@ -395,9 +396,9 @@ addEventListener("keydown", (e) => {
     if (mode === "street" && street.jumpY === 0) street.vy = JUMP_V;
   }
   if (e.code.startsWith("Arrow") || e.code === "PageUp" || e.code === "PageDown") e.preventDefault();
-  keys.add(e.code); if (e.shiftKey) keys.add("Shift");
+  keys.add(e.code);
 });
-addEventListener("keyup", (e) => { keys.delete(e.code); if (!e.shiftKey) keys.delete("Shift"); });
+addEventListener("keyup", (e) => { keys.delete(e.code); });
 addEventListener("blur", () => keys.clear());
 
 // street-view drag look
@@ -428,9 +429,12 @@ renderer.domElement.addEventListener("dblclick", (e) => {
 });
 
 function updateStreet(dt) {
-  const sp = (keys.has("Shift") ? RUN : WALK) * dt;
+  const sp = (keys.has("ShiftLeft") ? RUN : WALK) * dt;
   const fwd = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-  const side = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+  const lr = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+  const strafing = keys.has("ShiftRight") || keys.has("Slash");   // modifier: A/D strafe instead of turn
+  const side = strafing ? lr : 0;
+  if (lr && !strafing) { leaveVantage(false); street.yaw -= lr * TURN * dt; hashDirty = true; }
   if (fwd || side) {
     leaveVantage(false);
     street.x += (-Math.sin(street.yaw) * fwd + Math.cos(street.yaw) * side) * sp;
@@ -455,7 +459,7 @@ function updateOrbitKeys(dt) {
   const rot = k("KeyE") - k("KeyQ"), tilt = k("KeyF") - k("KeyR");
   const zoom = k("Equal", "NumpadAdd", "PageUp") - k("Minus", "NumpadSubtract", "PageDown");
   if (!(fwd || side || rot || tilt || zoom)) return;
-  const fast = keys.has("Shift") ? 3 : 1;
+  const fast = keys.has("ShiftLeft") ? 3 : 1;
   _off.subVectors(camera.position, orbit.target);
   if (fwd || side) {
     const speed = Math.max(10, _off.length() * 0.8) * fast * dt;
