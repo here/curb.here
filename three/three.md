@@ -154,6 +154,7 @@ scripts/osm_to_scene.py     Overpass → docs/sunset/data/scene.json
 docs/sunset/index.html      import map, UI (mode toggle, presets, attribution)
 docs/sunset/main.js         scene build + controls
 docs/sunset/data/scene.json baked data (committed)
+docs/sunset/data/photos.json  field photo poses; images in docs/sunset/photos/ (scripts/photo_to_scene.py)
 worker/wrangler.toml, worker/src/index.js
 ```
 To view locally, run `python3 -m http.server -d docs 8000` and open http://localhost:8000/sunset/.
@@ -173,7 +174,45 @@ To view locally, run `python3 -m http.server -d docs 8000` and open http://local
 - [ ] Find out what passes under the Sunset bridge (way 30528196) and fix the bridge model.
 - [ ] Better ground: USGS 3DEP 1 m DTM instead of building `ele`.
 
+## Field photos (first try, 2026-11-27)
+The viewer has two checkboxes, shown when `docs/sunset/data/photos.json` has photos:
+- **Field photos flat:** the photo alone, on a plane 6 m in front of where it was taken. An orange frustum and dot mark the vantage. The plane is drawn on top of everything.
+- **Field photos mapped:** the photo is projected onto the model's surfaces: terrain, roads, sidewalks, curbs and buildings.
+
+The toggles are stored in the URL hash (`ph=f`, `ph=m`, `ph=fm`). "Jump to… → Photo vantage" puts the camera at the photo's position, orientation (including roll) and vertical FOV. For example, `#v=street&ph=m&at=963797397764501`.
+
+**Photo used:** Mapillary [963797397764501](https://www.mapillary.com/app/?pKey=963797397764501), by gyllen, 2016-01-30, CC BY-SA 4.0.
+- It's the oldest usable photo near the intersection; the area has photos from 2016, 2018, 2019, 2022, 2023 and 2026.
+- It was taken eastbound on Sunset, in the rightmost lane, 45 m from the signal, looking at the intersection. The storefronts on the right include Silverlake Lounge, next door to Cafe Tropical.
+- The camera is a Garmin VIRB XE: wide (about 98° horizontal) with barrel distortion. The sky is overcast, so there are no hard shadows.
+- I viewed 1 of a 10-photo budget. I picked candidates by metadata first: non-panoramic, 15–70 m from the signal, heading within 35° of it, oldest first.
+
+**How it works**
+- `scripts/photo_to_scene.py ID…` fetches the pose and a 2048 px image into `docs/sunset/photos/` and `data/photos.json`.
+- Pose comes from Mapillary SfM: `computed_rotation` (angle-axis, ENU → camera) and `computed_geometry`. Checks: the forward vector gives heading 144.2°, matching `computed_compass_angle`, with pitch +1.6° and roll −4.3°. The position lands in the rightmost eastbound lane of the model's Sunset, which matches what the photo shows.
+- Camera height is **guessed at 1.2 m** from the lane-line perspective. Mapillary altitude isn't reliable.
+- The Mapillary perspective model is applied in the shader: `st = 0.5 + f·(1 + k1·r² + k2·r⁴)·(x/z, y/z)·max(w,h)/(w,h)`. The flat plane uses the same projection, so it shows the photo undistorted.
+- Occlusion uses a depth pass rendered from the photo camera (shadow-map style), so walls behind other buildings aren't painted. The guessed signal poles are excluded both as occluders and as receivers.
+- Projected pixels are unlit: they replace the model colour, with a soft fade at the image edges.
+
+**Can a photo cover the surfaces as presented?** From the vantage, yes, it looks right. Moving away shows what a single photo can and can't do:
+- **Works:** surfaces the camera faced, close to the right distance. The road and lane lines, the curb and the storefront walls on the right line up. In the test shots, the Silverlake Lounge facade still reads correctly from well off to one side.
+- **Missing:**
+  - Anything that isn't in the model has nowhere to land: sky, utility poles, the billboard, trees, cars as objects.
+  - Surfaces the photo didn't see stay plain: the backs and sides of buildings, the road behind the camera, and the far side of the street beyond the parked cars.
+- **Smears:**
+  - Surfaces seen at grazing angles stretch into streaks: walls running along the view direction, and the road right in front of the camera.
+  - Cars, poles and palms get flattened onto the road and walls, so they look right only from the vantage.
+  - Where the model's walls are set back from the real facades, or heights are off, content slides.
+
+Covering the intersection properly would take **many photos blended per surface**: for each fragment, use the photo that sees it most head-on and closest. Possible sources:
+- The same 2016 sequence has 5 frames from 24 to 66 m out.
+- There are 168 candidate perspective photos facing the intersection.
+- There are 215 panoramas in the focus area. A panorama covers every direction from one point and would cover the most surface per photo, but it needs an equirectangular projection instead of the perspective one used here.
+
+Better geometry (real facade lines, road widths from sidewalks) would reduce the sliding.
+
 ## Later (not now)
-- Field photos: put Mapillary, KartaView and Panoramax images in the scene as clickable billboards at their capture points and headings, and use them to check the guesses (lane widths, signal positions, trees).
+- Field photos, beyond the first try above: blend several photos, support panoramas, add KartaView and Panoramax, show vantage markers you can click, and use the photos to check the guesses (lane widths, signal positions, trees).
 - Trees, street lamps and utility poles: map them in OSM from a survey, then they'll show up in the scene automatically.
 - LA City or County curb and sidewalk datasets, if they're better than OSM.

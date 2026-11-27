@@ -16,6 +16,8 @@
   #help { position: fixed; left: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); padding: 6px 10px; background: #fffd; border-radius: 6px; max-width: min(60ch, calc(100% - 40px)); }
   #attr { position: fixed; right: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); padding: 4px 8px; background: #fffd; border-radius: 6px; font-size: 12px; }
   #attr a { color: inherit; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toggles label { display: flex; gap: 5px; align-items: center; padding: 5px 9px; background: #fff; border: 1px solid #0003; border-radius: 6px; cursor: pointer; user-select: none; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 16px; }
   .label { font: 600 12px system-ui, sans-serif; }
 </style>
@@ -34,9 +36,13 @@
   <select id="preset" aria-label="Jump to a spot">
     <option value="">Jump to…</option>
   </select>
+  <span id="photo-toggles" class="toggles" hidden>
+    <label title="The photo alone, flat, in front of where it was taken"><input type="checkbox" id="ph-flat"> Field photos flat</label>
+    <label title="The photo projected onto the model's surfaces"><input type="checkbox" id="ph-mapped"> Field photos mapped</label>
+  </span>
 </div>
 <div id="help"></div>
-<div id="attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL · some sizes guessed</div>
+<div id="attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL · some sizes guessed<span id="photo-credit" hidden> · Photo <a href="#" target="_blank" rel="noopener"></a> via Mapillary, CC BY-SA 4.0</span></div>
 <script type="module" src="./main.js"></script>
 </body>
 </html>

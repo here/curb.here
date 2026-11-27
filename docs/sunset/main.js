@@ -298,8 +298,8 @@ function build(S) {
     const h = new THREE.BoxGeometry(0.35, 1.0, 0.35);
     h.translate(x + dx / L * arm, y + 5.6, z + dz / L * arm); headG.push(h);
   }
-  addMerged(poleG, lambert(COLORS.pole), { cast: true });
-  addMerged(headG, lambert(COLORS.head), { cast: true });
+  for (const m of [addMerged(poleG, lambert(COLORS.pole), { cast: true }),
+                   addMerged(headG, lambert(COLORS.head), { cast: true })]) if (m) m.userData.noPhoto = true;
 
   // labels
   for (const l of S.labels) label(l.text.replace(/^West /, ""), l.p[0], l.p[1], "street");
@@ -339,7 +339,17 @@ function label(text, x, z, cls, dy = 4) {
 
 // ---- controls ---------------------------------------------------------------------------
 let mode = "orbit";
-const street = { x: 0, z: 0, yaw: 0, pitch: 0 };
+const street = { x: 0, z: 0, yaw: 0, pitch: 0, vantage: null }; // vantage: {eye, quat, fov} from a photo
+const FOV = 60;
+function leaveVantage(keepLook) {
+  const v = street.vantage; if (!v) return;
+  if (keepLook) { // carry the photo's look direction into yaw/pitch (roll is dropped)
+    const e = new THREE.Euler().setFromQuaternion(v.quat, "YXZ");
+    street.yaw = e.y; street.pitch = -e.x;
+  }
+  street.vantage = null;
+  if (!keepLook) { camera.fov = FOV; camera.updateProjectionMatrix(); }
+}
 const keys = new Set();
 
 function setMode(m, opts = {}) {
@@ -354,10 +364,13 @@ function setMode(m, opts = {}) {
     if (opts.x === undefined) {
       const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
       Object.assign(street, { x: orbit.target.x, z: orbit.target.z, yaw: Math.atan2(-dir.x, -dir.z), pitch: 0 });
-    } else Object.assign(street, { pitch: 0, ...opts });
+    } else Object.assign(street, { pitch: 0, vantage: null, ...opts });
+    camera.fov = street.vantage?.fov ?? FOV; camera.updateProjectionMatrix();
   } else if (opts.pos) {
+    street.vantage = null; camera.fov = FOV; camera.updateProjectionMatrix();
     camera.position.set(...opts.pos); orbit.target.set(...opts.target);
   } else {
+    street.vantage = null; camera.fov = FOV; camera.updateProjectionMatrix();
     const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
     orbit.target.copy(camera.position).addScaledVector(dir, 25);
     camera.position.y += 20; // step back up a little so orbit has room
@@ -369,10 +382,11 @@ $("mode").onclick = () => setMode(mode === "orbit" ? "street" : "orbit");
 $("preset").onchange = (e) => {
   const p = presets[+e.target.value]; e.target.value = "";
   if (!p) return;
+  if (p.photo) return goVantage(p.photo);
   p.mode === "street" ? setMode("street", { x: p.x, z: p.z, yaw: p.yaw }) : setMode("orbit", p);
 };
 addEventListener("keydown", (e) => {
-  if (e.target.tagName === "SELECT") return;
+  if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
   if (e.key === "v" || e.key === "V") return setMode(mode === "orbit" ? "street" : "orbit");
   keys.add(e.code); if (e.shiftKey) keys.add("Shift");
 });
@@ -383,6 +397,7 @@ addEventListener("blur", () => keys.clear());
 let drag = null;
 renderer.domElement.addEventListener("pointerdown", (e) => {
   if (mode !== "street") return;
+  leaveVantage(true);
   drag = { x: e.clientX, y: e.clientY }; renderer.domElement.setPointerCapture(e.pointerId);
 });
 renderer.domElement.addEventListener("pointermove", (e) => {
@@ -400,7 +415,7 @@ renderer.domElement.addEventListener("dblclick", (e) => {
   ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObjects(pickables, false)[0];
   if (!hit) return;
-  if (mode === "street") { street.x = hit.point.x; street.z = hit.point.z; }
+  if (mode === "street") { leaveVantage(false); street.x = hit.point.x; street.z = hit.point.z; }
   else orbit.target.copy(hit.point);
   saveHash();
 });
@@ -410,15 +425,15 @@ function updateStreet(dt) {
   const fwd = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
   const side = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
   if (fwd || side) {
+    leaveVantage(false);
     street.x += (-Math.sin(street.yaw) * fwd + Math.cos(street.yaw) * side) * sp;
     street.z += (-Math.cos(street.yaw) * fwd - Math.sin(street.yaw) * side) * sp;
     hashDirty = true;
   }
-  camera.position.set(street.x, ground(street.x, street.z) + CURB + EYE, street.z);
-  camera.rotation.set(0, 0, 0, "YXZ");
-  camera.rotation.order = "YXZ";
-  camera.rotation.y = street.yaw;
-  camera.rotation.x = -street.pitch;
+  const v = street.vantage;
+  camera.position.set(street.x, ground(street.x, street.z) + (v ? v.eye : CURB + EYE), street.z);
+  if (v) { camera.quaternion.copy(v.quat); return; }
+  camera.rotation.set(-street.pitch, street.yaw, 0, "YXZ");
 }
 
 // ---- URL hash: #v=street&x=..&z=..&yaw=..&pitch=..  or  #v=orbit&c=x,y,z&t=x,y,z ---------
@@ -427,20 +442,219 @@ const f1 = (n) => n.toFixed(1), f2 = (n) => n.toFixed(2);
 function saveHash() { hashDirty = true; }
 function writeHash() {
   if (!hashDirty) return; hashDirty = false;
-  const h = mode === "street"
+  const ph = (photoUI.flat.checked ? "f" : "") + (photoUI.mapped.checked ? "m" : "");
+  const extra = (ph ? `&ph=${ph}` : "") + (street.vantage && mode === "street" ? `&at=${street.vantage.id}` : "");
+  const h = (mode === "street"
     ? `v=street&x=${f1(street.x)}&z=${f1(street.z)}&yaw=${f2(street.yaw)}&pitch=${f2(street.pitch)}`
-    : `v=orbit&c=${camera.position.toArray().map(f1)}&t=${orbit.target.toArray().map(f1)}`;
+    : `v=orbit&c=${camera.position.toArray().map(f1)}&t=${orbit.target.toArray().map(f1)}`) + extra;
   history.replaceState(null, "", "#" + h);
 }
 setInterval(writeHash, 500);
 orbit.addEventListener("end", saveHash);
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
+  const ph = q.get("ph") || "";
+  photoUI.flat.checked = ph.includes("f"); photoUI.mapped.checked = ph.includes("m");
+  applyPhotoToggles();
+  const at = photos.find((p) => p.id === q.get("at"));
+  if (at) return goVantage(at);
   if (q.get("v") === "street")
     return setMode("street", { x: +q.get("x") || 0, z: +q.get("z") || 0, yaw: +q.get("yaw") || 0, pitch: +q.get("pitch") || 0 });
   const c = q.get("c")?.split(",").map(Number), t = q.get("t")?.split(",").map(Number);
   if (c?.length === 3 && t?.length === 3 && c.every(isFinite) && t.every(isFinite)) setMode("orbit", { pos: c, target: t });
   else setMode("orbit", presets[0]);
+}
+
+// ---- field photos ------------------------------------------------------------------------
+// One photo at a time is projected with its SfM pose and the camera's radial distortion
+// (Mapillary perspective model: f normalised by max(w, h), k1, k2). Two independent toggles:
+//  - flat:   a plane in front of the vantage that the photo is projected onto (undistorted)
+//  - mapped: every surface receives the projection; a depth pass from the photo camera keeps
+//            hidden surfaces (behind buildings) from being painted.
+const photos = [];
+const photoUI = { flat: $("ph-flat"), mapped: $("ph-mapped") };
+const PHOTO_GLSL = `
+uniform sampler2D photoTex; uniform mat4 photoView; uniform vec3 photoK; uniform vec2 photoScale;
+vec2 photoST(vec3 w) {             // world -> image [0,1]^2 (y down); far outside when not in view
+  vec4 pc = photoView * vec4(w, 1.0);
+  if (pc.z < 0.3) return vec2(-1.0);
+  vec2 n = pc.xy / pc.z; float r2 = dot(n, n);
+  if (r2 > 4.0) return vec2(-1.0);
+  float d = 1.0 + photoK.y * r2 + photoK.z * r2 * r2;
+  return 0.5 + photoK.x * d * n * photoScale;
+}
+float photoEdge(vec2 st) { return smoothstep(0.0, 0.015, min(min(st.x, 1.0 - st.x), min(st.y, 1.0 - st.y))); }
+vec3 photoRGB(vec2 st) { return texture2D(photoTex, vec2(st.x, 1.0 - st.y)).rgb; }
+`;
+const photoU = {
+  photoTex: { value: null }, photoView: { value: new THREE.Matrix4() },
+  photoK: { value: new THREE.Vector3() }, photoScale: { value: new THREE.Vector2(1, 1) },
+  photoOn: { value: 0 }, depthTex: { value: null }, depthMat: { value: new THREE.Matrix4() },
+  depthNF: { value: new THREE.Vector2(0.5, 800) },
+};
+const depthCam = new THREE.PerspectiveCamera(115, 4 / 3, 0.5, 800);
+depthCam.layers.set(1);
+const depthRT = new THREE.WebGLRenderTarget(2048, 2048, { depthTexture: new THREE.DepthTexture(2048, 2048) });
+let photoGroup = null, current = null;
+
+// Patch the Lambert materials so they can receive the projected photo (unlit, replaces colour).
+function patchMaterial(mat) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, photoU);
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vPhotoW;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvPhotoW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", `#include <common>
+varying vec3 vPhotoW; uniform float photoOn; uniform sampler2D depthTex; uniform mat4 depthMat; uniform vec2 depthNF;
+${PHOTO_GLSL}
+float photoVisible(vec3 w) {
+  vec4 dc = depthMat * vec4(w, 1.0);
+  vec3 dn = dc.xyz / dc.w;
+  if (any(greaterThan(abs(dn.xy), vec2(1.0)))) return 0.0;
+  float z = texture2D(depthTex, dn.xy * 0.5 + 0.5).x * 2.0 - 1.0;
+  float n = depthNF.x, f = depthNF.y;
+  float lin = 2.0 * n * f / (f + n - z * (f - n));
+  return step(dc.w, lin + 0.3 + 0.015 * dc.w);
+}`)
+      .replace("#include <opaque_fragment>", `#include <opaque_fragment>
+if (photoOn > 0.5) {
+  vec2 st = photoST(vPhotoW);
+  float a = photoEdge(st);
+  if (a > 0.0) a *= photoVisible(vPhotoW);
+  if (a > 0.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, photoRGB(st), a);
+}`);
+  };
+  mat.customProgramCacheKey = () => "photo-v1";
+  mat.needsUpdate = true;
+}
+
+// Invert the radial distortion: image offset u (normalised, = f*d*n) -> ray n.
+function undistort(ux, uy, P) {
+  let nx = ux / P.f, ny = uy / P.f;
+  for (let i = 0; i < 30; i++) {
+    const r2 = nx * nx + ny * ny, d = 1 + P.k1 * r2 + P.k2 * r2 * r2;
+    nx = ux / (P.f * d); ny = uy / (P.f * d);
+  }
+  return [nx, ny];
+}
+
+function photoBasis(P) {
+  // R_enu maps ENU (e, n, u) to camera (right, down, forward). three: x=e, y=u, z=-n.
+  const R = P.R_enu, row = (i) => new THREE.Vector3(R[i][0], R[i][2], -R[i][1]);
+  const right = row(0), down = row(1), fwd = row(2);
+  const C = new THREE.Vector3(P.p[0], ground(P.p[0], P.p[1]) + P.h, P.p[1]);
+  return { right, down, fwd, C };
+}
+
+function photoQuat(B) { // three.js camera: +x right, +y up, looks down -z
+  const m = new THREE.Matrix4().makeBasis(B.right, B.down.clone().negate(), B.fwd.clone().negate());
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+function selectPhoto(P) {
+  current = P;
+  const B = photoBasis(P);
+  const v = photoU.photoView.value, t = B.C;
+  const r = [B.right, B.down, B.fwd];
+  v.set(...r.flatMap((a) => [a.x, a.y, a.z, -a.dot(t)]), 0, 0, 0, 1);
+  const mx = Math.max(P.width, P.height);
+  photoU.photoK.value.set(P.f, P.k1, P.k2);
+  photoU.photoScale.value.set(mx / P.width, mx / P.height);
+  photoU.photoTex.value = P.texture;
+  // depth pass from the photo camera (scene is static, so once per photo)
+  depthCam.position.copy(B.C); depthCam.quaternion.copy(photoQuat(B));
+  depthCam.updateMatrixWorld(); depthCam.updateProjectionMatrix();
+  photoU.depthMat.value.multiplyMatrices(depthCam.projectionMatrix, depthCam.matrixWorldInverse);
+  const on = photoU.photoOn.value; photoU.photoOn.value = 0; photoU.depthTex.value = null; // no feedback loop
+  renderer.setRenderTarget(depthRT); renderer.render(scene, depthCam); renderer.setRenderTarget(null);
+  photoU.depthTex.value = depthRT.depthTexture; photoU.photoOn.value = on;
+  buildFlat(P, B);
+}
+
+// Flat photo: a plane D metres in front of the vantage, with a frustum outline and a marker.
+function buildFlat(P, B) {
+  if (photoGroup) scene.remove(photoGroup);
+  photoGroup = new THREE.Group();
+  const D = 6, mx = Math.max(P.width, P.height);
+  const hx = 0.5 * P.width / mx, hy = 0.5 * P.height / mx;
+  const corners = [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]].map(([ux, uy]) => undistort(ux, uy, P));
+  const ext = corners.reduce((a, [x, y]) => [Math.max(a[0], Math.abs(x)), Math.max(a[1], Math.abs(y))], [0, 0]);
+  const at = (nx, ny, dist) => B.C.clone().addScaledVector(B.fwd, dist)
+    .addScaledVector(B.right, nx * dist).addScaledVector(B.down, ny * dist);
+  // plane big enough for every ray; the shader cuts it to the photo's (distorted) outline
+  const g = new THREE.BufferGeometry().setFromPoints([at(-ext[0], -ext[1], D), at(ext[0], -ext[1], D),
+    at(ext[0], ext[1], D), at(-ext[0], ext[1], D)]);
+  g.setIndex([0, 2, 1, 0, 3, 2]);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: photoU, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+    vertexShader: `varying vec3 vW; void main() { vW = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`,
+    fragmentShader: `varying vec3 vW; ${PHOTO_GLSL}
+      void main() { vec2 st = photoST(vW); if (photoEdge(st) <= 0.0) discard;
+        gl_FragColor = vec4(photoRGB(st), 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+  const plane = new THREE.Mesh(g, mat); plane.renderOrder = 999;
+  const pts = [];
+  for (const [x, y] of corners) pts.push(B.C, at(x, y, D));
+  corners.forEach(([x, y], i) => { const [x2, y2] = corners[(i + 1) % 4]; pts.push(at(x, y, D), at(x2, y2, D)); });
+  const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
+  lines.renderOrder = 998;
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff7a00 }));
+  dot.position.copy(B.C);
+  photoGroup.add(plane, lines, dot);
+  photoGroup.visible = photoUI.flat.checked;
+  scene.add(photoGroup);
+}
+
+function goVantage(P) {
+  if (current !== P) selectPhoto(P);
+  const B = photoBasis(P), mx = Math.max(P.width, P.height);
+  const [, ny] = undistort(0, 0.5 * P.height / mx, P);
+  setMode("street", { x: P.p[0], z: P.p[1], vantage: {
+    id: P.id, eye: P.h, quat: photoQuat(B), fov: THREE.MathUtils.radToDeg(2 * Math.atan(ny)) } });
+}
+
+function applyPhotoToggles() {
+  if (photoGroup) photoGroup.visible = photoUI.flat.checked;
+  photoU.photoOn.value = photoUI.mapped.checked ? 1 : 0;
+  const on = photoUI.flat.checked || photoUI.mapped.checked;
+  $("photo-credit").hidden = !on || !current;
+  if (current) {
+    const a = $("photo-credit").querySelector("a");
+    a.href = current.url;
+    a.textContent = `${current.creator}, ${new Date(current.captured_at).toISOString().slice(0, 10)}`;
+  }
+  saveHash();
+}
+
+async function setupPhotos() {
+  let list = [];
+  try { list = (await (await fetch("./data/photos.json")).json()).photos; } catch { return; }
+  const loader = new THREE.TextureLoader();
+  for (const P of list) {
+    P.texture = await loader.loadAsync("./" + P.image);
+    P.texture.colorSpace = THREE.SRGBColorSpace;
+    P.texture.anisotropy = 8;
+    photos.push(P);
+  }
+  if (!photos.length) return;
+  scene.traverse((o) => {
+    if (!o.isMesh || o.userData.noPhoto) return;
+    o.layers.enable(1);                       // seen by the photo depth pass
+    if (o.material?.isMeshLambertMaterial) patchMaterial(o.material);
+  });
+  selectPhoto(photos[0]);
+  for (const P of photos) {
+    const label = `Photo vantage (${new Date(P.captured_at).toISOString().slice(0, 10)})`;
+    presets.push({ name: label, photo: P });
+    $("preset").add(new Option(label, presets.length - 1));
+  }
+  photoUI.flat.onchange = photoUI.mapped.onchange = applyPhotoToggles;
+  $("photo-toggles").hidden = false;
 }
 
 // ---- go ---------------------------------------------------------------------------------
@@ -451,6 +665,7 @@ addEventListener("resize", () => {
 
 const S = await (await fetch("./data/scene.json")).json();
 build(S);
+await setupPhotos();
 $("loading").remove();
 readHash();
 
@@ -461,4 +676,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
 });
-window.__scene = { scene, camera, S }; // for debugging in the console
+window.__scene = { scene, camera, S, photos }; // for debugging in the console
