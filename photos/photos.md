@@ -11,7 +11,7 @@ Bbox `-118.2757,34.0811,-118.2714,34.0847` (~200 m around 2900 W Sunset Blvd).
 | | Images | Sequences | Years | Notes |
 |---|---|---|---|---|
 | **Mapillary** | **1,515** | 21 | 2016 (92), 2018 (852), 2019 (238), 2022 (66), 2023 (117), **2026 (150)** | 216 panoramas, 7 contributors; the only source with current imagery |
-| **KartaView** | 4 | 4 | 2019 | radius 200 m |
+| **KartaView** | **355** | 4 (photos in bbox); up to 134 touch the bbox | 2016–2022 | `1.0/list/nearby-photos`; the earlier `2.0/photo` count of 4 was an undercount |
 | **Panoramax** | 0 | — | — | — |
 
 Run it again with `scripts/mapillary_coverage.py -118.2757,34.0811,-118.2714,34.0847`.
@@ -41,6 +41,7 @@ Run it again with `scripts/mapillary_coverage.py -118.2757,34.0811,-118.2714,34.
 ### KartaView
 - **Pro:** CC-BY-SA, keyless API, road-feature detection, good for dashcam-style sequences.
 - **Pro:** real Silver Lake coverage (≥376 photos, 67 sequences). Good for a historical (2016–2022) view.
+- **Pro:** OSM login works (`scripts/kartaview_login.py`), but reading doesn't need it.
 - **Con:** nothing captured after 2022; low community momentum (app at ~3.2★, crash complaints); bbox and sequence endpoints are restricted.
 - **Con:** owned by one company, which could change priorities.
 

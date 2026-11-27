@@ -26,10 +26,30 @@
 - Our setup: a **public** OSM app (no secret) using PKCE and the redirect URI `urn:ietf:wg:oauth:2.0:oob` (OSM shows the code; you paste it).
   No callback server or Cloudflare Worker is needed.
 - Run `python3 -I scripts/kartaview_login.py` once; it saves `KARTAVIEW_ACCESS_TOKEN` to `.env`.
-- TODO: after login, retest the endpoints that returned "Restricted access!" (`/2.0/sequence/`, photo search by `tLeft`/`bRight`).
+- **Login works (2026-11-27):** `/2.0/user/profile` returns 200 with either the `Access-Token` or the `X-Auth-Token` header.
+- **The token isn't needed for reading.** Every read query below behaves the same with or without it.
+  "Restricted access!" came from how the request was built (missing or unsupported parameters), not from a missing login.
+
+### Read endpoints that work (no auth), tested 2026-11-27
+| Query | Result |
+|---|---|
+| `GET /2.0/photo/?lat=&lng=&radius=&itemsPerPage<=150` | ok, but sparse (about one photo per sequence) |
+| `GET /2.0/photo/?sequenceId=<id>&itemsPerPage=150` | ok, all photos in a sequence |
+| `GET /2.0/sequence/?tLeft=<lat,lng>&bRight=<lat,lng>&itemsPerPage=100&page=N` | ok, sequences whose extent touches the bbox |
+| `GET /2.0/sequence/<id>` | ok |
+| `POST /1.0/list/nearby-photos/` with `lat, lng, radius` | ok, dense: every photo near the point |
+| `POST /1.0/tracks/` with `bbTopLeft, bbBottomRight, zoom` | ok, track geometries |
+| `GET /2.0/photo/?tLeft&bRight` | **Restricted access!** (photo search doesn't accept a bbox) |
+| `GET /2.0/sequence/` without a location filter | **Restricted access!** |
 
 ## Browser data source
 - Example Silver Lake view: https://kartaview.org/map/@34.07717906271594,-118.28228247976563,17z
+
+## Focus area: Cafe Tropical (bbox `-118.2757,34.0811,-118.2714,34.0847`), tested 2026-11-27
+- `1.0/list/nearby-photos` (radius 300 around the cafe) returned 429 photos. **355 fall inside the focus bbox, from 4 sequences.**
+- `2.0/sequence` with a bbox returns **134 sequences whose extent touches the bbox**, uploaded 2016–2022.
+  This is an upper bound: many are long drives that pass near the area.
+- The earlier `2.0/photo` radius query found only 4 photos because it returns roughly one photo per sequence.
 
 ## Silver Lake coverage — tested 2026-11-27
 Grid of 7×8 radius-400 m queries over the bbox `-118.285,34.075,-118.250,34.105`:
