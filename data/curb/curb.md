@@ -30,6 +30,12 @@ Checked on 2026-11-27.
 - Describes itself as coordinating access to curb space across cities, property owners, businesses, fleets, pedestrians, cyclists, delivery services and autonomous systems, with real-time allocation.
 - The site is a JavaScript app and the public page says nothing more. Its API, coverage (LA?), pricing, data license and CDS support are **not yet known**, so follow up.
 
+### Open Sidewalks
+- https://www.opensidewalks.org/ — sidewalk and walkway data for the US, Canada and Mexico (about 1.89 million km), merging official open sidewalk datasets with OpenStreetMap line by line, with a source record on each line.
+- Run by an independent builder (ex-Meta/Mapillary) and **not affiliated with the OpenSidewalks project at the UW Taskar Center** (the OSW schema, AccessMap and TDEI). Those are a separate project and aren't covered by this site; check them separately.
+- Data credits: OpenStreetMap (ODbL), Statistics Canada (Open Government Licence – Canada), INEGI and US city, county and state open datasets.
+- The public page doesn't mention an API, pricing or LA/Silver Lake coverage, so those are **not yet known**. Follow up.
+
 ### CDS vendors (short list)
 Picked from the OMF CDS users list for LA presence or curb-data focus. The list doesn't say which APIs each one implements.
 
