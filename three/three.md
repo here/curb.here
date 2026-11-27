@@ -88,7 +88,7 @@ Run `scripts/osm_to_scene.py` to fetch and bake, or `scripts/osm_to_scene.py --o
 - **Lighting:** `HemisphereLight` plus one `DirectionalLight` placed at the LA afternoon sun angle (a nice touch for "sunset"), with soft shadows on a 512 m map. Optionally, set the sun from the current time.
 
 ## Navigation
-The viewer opens in **orbit** view with the buttons hidden. **Show buttons**, next to the title, reveals the rest; the **reset** button before it returns to the defaults and reloads. The camera state is kept in the URL hash (for example `#v=street&x=12.3&z=-4.0&yaw=1.2`), so a view can be shared as a link.
+The viewer opens in **orbit** view with the buttons hidden, at `START_VIEW` in `main.js` (`c=-163.8,71.3,-166.3`, `t=38.9,-47.7,7.8`; the **Overview** preset is a separate view). **Show buttons**, next to the title, reveals the rest; the **reset** button before it returns to the defaults and reloads. The camera state is kept in the URL hash (for example `#v=street&x=12.3&z=-4.0&yaw=1.2`), so a view can be shared as a link.
 
 | | Orbit (default, `OrbitControls`) | Street view (eye height 1.6 m) |
 |---|---|---|

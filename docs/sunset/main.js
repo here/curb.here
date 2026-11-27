@@ -517,6 +517,8 @@ function setControls(show) {
 $("reset").onclick = () => location.replace(location.pathname + "?r=" + Date.now());
 if (new URL(location.href).searchParams.has("r")) history.replaceState(null, "", location.pathname + location.hash); // tidy the URL
 $("ui-toggle").onclick = () => { setControls($("controls").hidden); saveHash(); };
+// The view when the URL gives none (the "Overview" preset is separate).
+const START_VIEW = { pos: [-163.8, 71.3, -166.3], target: [38.9, -47.7, 7.8] };
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   const ph = q.has("ph") ? q.get("ph") : "f";            // default: photos flat, not mapped
@@ -531,7 +533,7 @@ function readHash() {
     return setMode("street", { x: +q.get("x") || 0, z: +q.get("z") || 0, yaw: +q.get("yaw") || 0, pitch: +q.get("pitch") || 0 });
   const c = q.get("c")?.split(",").map(Number), t = q.get("t")?.split(",").map(Number);
   if (c?.length === 3 && t?.length === 3 && c.every(isFinite) && t.every(isFinite)) setMode("orbit", { pos: c, target: t });
-  else setMode("orbit", presets[0]);
+  else setMode("orbit", START_VIEW);
 }
 
 // ---- field photos ------------------------------------------------------------------------
