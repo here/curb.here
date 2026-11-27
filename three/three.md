@@ -134,7 +134,12 @@ The Worker is in [`worker/wrangler.toml`](../worker/wrangler.toml) and [`worker/
 - proxies `curb.here/*` to `https://here.github.io/curb.here/*`, for `GET`/`HEAD` only;
 - redirects `/sunset` to `/sunset/`, because the page's relative URLs need the trailing slash;
 - rewrites GitHub `Location` headers back onto curb.here;
-- caches at the edge for 5 minutes and strips GitHub/Fastly headers.
+- sets caching itself, which also replaces the zone's 4 h browser default (deployed 2026-11-27):
+  - pages (`/`, `.html`): `no-cache` in the browser, 60 s at the edge;
+  - `?v=` stamped files: `immutable`, cached for a year in the browser and a day at the edge;
+  - other files: 5 minutes;
+  - 404s are cached 30 s at the edge and `no-store` in the browser;
+- strips GitHub/Fastly headers.
 
 Tested locally with Node against the real upstream: `/sunset` gives 301 → `/sunset/`, and the other paths pass through.
 
@@ -164,7 +169,7 @@ worker/wrangler.toml, worker/src/index.js
 **Cache-busting:** after changing anything in `docs/sunset/`, run `scripts/stamp_sunset.py` and commit `index.html` along with the change. The two bakers run it automatically.
 - It stamps `main.js?v=<content hash>` into `index.html`. `main.js` passes the same `?v=` on to `scene.json`, `photos.json` and the photo images, so a page load never mixes old and new files.
 - Why it's needed: the curb.here zone sends `Cache-Control: max-age=14400` (Cloudflare's default 4-hour browser cache), overriding GitHub's 10 minutes.
-- `index.html` itself still needs a short cache from the Worker; see Hosting.
+- `index.html` gets `no-cache` from the Worker (see Hosting), so a new stamp is picked up on the next load.
 
 To view locally, run `python3 -m http.server -d docs 8000` and open http://localhost:8000/sunset/.
 
