@@ -225,14 +225,25 @@ The toggles are stored in the URL hash: `ph=f`, `ph=m` or `ph=fm`, plus `poff=2`
 **Photo 5:** Mapillary [1191635439743321](https://www.mapillary.com/app/?pKey=1191635439743321), by inlandurbanist, 2023-06-20 (GoPro Hero 7), heading 310°, pitch +2.2°.
 - It was taken in the middle of the intersection, 3 m from the signal, looking northwest. It's the newest photo, from 7 years after photos 1–4.
 
-Photos 4 and 5 were picked by metadata only and are **not checked in the viewer** (1.2 m camera height guessed). Photos within 120 m of the signal only face two ways along Sunset (about 140° and 310°), so there are few truly different directions beyond photos 3 and 4. `MAXP` is now 5, which is the limit of one shader loop.
+Photos 4 and 5 were picked by metadata only and are **not checked in the viewer** (1.2 m camera height guessed). Photos within 120 m of the signal only face two ways along Sunset (about 140° and 310°), so there are few truly different directions beyond photos 3 and 4. `MAXP` is now 10; see the notes under photos 6–10.
+
+**Photos 6–10** (all picked by metadata only and **not checked in the viewer**; 1.2 m camera height guessed). They're spread by position, heading and date:
+- **6:** Mapillary [213480793558423](https://www.mapillary.com/app/?pKey=213480793558423), gyllen, 2016-01-30. Far northwest (about 170 m out), looking southeast toward the intersection.
+- **7:** [2966239396929564](https://www.mapillary.com/app/?pKey=2966239396929564), gyllen, 2016-01-30. Southeast of the intersection (about 165 m out), looking southeast, away from it.
+- **8:** [298764735081568](https://www.mapillary.com/app/?pKey=298764735081568), mapkin, 2016-08-04. Far southeast, looking northwest up Sunset.
+- **9:** [2325730507557302](https://www.mapillary.com/app/?pKey=2325730507557302), mapkin, 2016-08-04. Far northwest, looking north-northwest.
+- **10:** [316723689810082](https://www.mapillary.com/app/?pKey=316723689810082), voschix, 2016-11-04 (Sony Xperia). At the intersection, looking northwest. It's close to photo 5's spot, but a different camera and date.
+
+Within 170 m of the signal, photos only face along Sunset, so these differ mostly in position and date.
+
+**Why 10 is the limit now:** the depth passes for all photos share one atlas (4×4 tiles of 1024 px), so the shader needs one sampler per photo plus one. GPUs guarantee only 16 samplers, so 10 photos leaves room; going beyond about 12 would need a different approach (such as texture arrays).
 
 **How it works**
 - `scripts/photo_to_scene.py ID…` fetches the pose and a 2048 px image into `docs/sunset/photos/` and `data/photos.json`.
 - Pose comes from Mapillary SfM: `computed_rotation` (angle-axis, ENU → camera) and `computed_geometry`. Checks: the forward vector gives heading 144.2°, matching `computed_compass_angle`, with pitch +1.6° and roll −4.3°. The position lands in the rightmost eastbound lane of the model's Sunset, which matches what the photo shows.
 - Camera height is **guessed at 1.2 m** from the lane-line perspective. Mapillary altitude isn't reliable.
 - The Mapillary perspective model is applied in the shader: `st = 0.5 + f·(1 + k1·r² + k2·r⁴)·(x/z, y/z)·max(w,h)/(w,h)`. The flat plane uses the same projection, so it shows the photo undistorted.
-- Occlusion uses a depth pass rendered from each photo camera (shadow-map style), so walls behind other buildings aren't painted. Up to 5 photos share one shader loop (`MAXP`). The guessed signal poles are excluded both as occluders and as receivers.
+- Occlusion uses a depth pass rendered from each photo camera (shadow-map style), so walls behind other buildings aren't painted. Up to 10 photos share one shader loop (`MAXP`). The guessed signal poles are excluded both as occluders and as receivers.
 - Projected pixels are unlit: they replace the model colour, with a soft fade at the image edges.
 
 **Can a photo cover the surfaces as presented?** From the vantage, yes, it looks right. Moving away shows what a single photo can and can't do:

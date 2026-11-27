@@ -525,7 +525,10 @@ function readHash() {
 //  - mapped: surfaces receive the projection. Per photo, a depth pass from its camera keeps
 //            hidden surfaces from being painted. Where photos overlap, the first one in
 //            photos.json that sees the surface wins (no blending).
-const MAXP = 5;
+const MAXP = 10;
+// Depth passes for all photos share one atlas (ATLAS_N x ATLAS_N tiles of TILE px), so the shader
+// needs MAXP + 1 samplers instead of 2 x MAXP (GPUs guarantee only 16).
+const ATLAS_N = 4, TILE = 1024;
 const photos = [];
 const photoUI = { flat: $("ph-flat"), mapped: $("ph-mapped") };
 const PHOTO_FN = `
@@ -542,7 +545,8 @@ float photoEdge(vec2 st) { return smoothstep(0.0, 0.015, min(min(st.x, 1.0 - st.
 const blank = new THREE.DataTexture(new Uint8Array(4), 1, 1); blank.needsUpdate = true;
 const photoU = {
   photoOn: { value: 0 }, photoCount: { value: 0 }, photoEnabled: { value: Array(MAXP).fill(1) }, depthNF: { value: new THREE.Vector2(0.5, 800) },
-  photoTex: { value: Array(MAXP).fill(blank) }, photoDepth: { value: Array(MAXP).fill(blank) },
+  photoTex: { value: Array(MAXP).fill(blank) }, photoDepthAtlas: { value: blank },
+  photoTile: { value: Array.from({ length: MAXP }, (_, i) => new THREE.Vector2(i % ATLAS_N, Math.floor(i / ATLAS_N))) },
   photoView: { value: Array.from({ length: MAXP }, () => new THREE.Matrix4()) },
   photoDepthMat: { value: Array.from({ length: MAXP }, () => new THREE.Matrix4()) },
   photoK: { value: Array.from({ length: MAXP }, () => new THREE.Vector3()) },
@@ -559,15 +563,15 @@ function patchMaterial(mat) {
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", `#include <common>
 varying vec3 vPhotoW; uniform float photoOn; uniform int photoCount; uniform vec2 depthNF; uniform float photoEnabled[${MAXP}];
-uniform sampler2D photoTex[${MAXP}]; uniform sampler2D photoDepth[${MAXP}];
+uniform sampler2D photoTex[${MAXP}]; uniform sampler2D photoDepthAtlas; uniform vec2 photoTile[${MAXP}];
 uniform mat4 photoView[${MAXP}]; uniform mat4 photoDepthMat[${MAXP}];
 uniform vec3 photoK[${MAXP}]; uniform vec2 photoScale[${MAXP}];
 ${PHOTO_FN}
-float photoVisible(vec3 w, mat4 DM, sampler2D D) {
+float photoVisible(vec3 w, mat4 DM, vec2 tile) {
   vec4 dc = DM * vec4(w, 1.0);
   vec3 dn = dc.xyz / dc.w;
   if (any(greaterThan(abs(dn.xy), vec2(1.0)))) return 0.0;
-  float z = texture2D(D, dn.xy * 0.5 + 0.5).x * 2.0 - 1.0;
+  float z = texture2D(photoDepthAtlas, (tile + clamp(dn.xy * 0.5 + 0.5, 0.002, 0.998)) / ${ATLAS_N}.0).x * 2.0 - 1.0;
   float n = depthNF.x, f = depthNF.y;
   float lin = 2.0 * n * f / (f + n - z * (f - n));
   return step(dc.w, lin + 0.3 + 0.015 * dc.w);
@@ -580,7 +584,7 @@ if (photoOn > 0.5) {
     if (!photoDone && UNROLLED_LOOP_INDEX < photoCount && photoEnabled[ i ] > 0.5) {
       vec2 st = photoST(vPhotoW, photoView[ i ], photoK[ i ], photoScale[ i ]);
       float a = photoEdge(st);
-      if (a > 0.0) a *= photoVisible(vPhotoW, photoDepthMat[ i ], photoDepth[ i ]);
+      if (a > 0.0) a *= photoVisible(vPhotoW, photoDepthMat[ i ], photoTile[ i ]);
       if (a > 0.0) {
         gl_FragColor.rgb = mix(gl_FragColor.rgb, texture2D(photoTex[ i ], vec2(st.x, 1.0 - st.y)).rgb, a);
         photoDone = a > 0.99;
@@ -590,7 +594,7 @@ if (photoOn > 0.5) {
   #pragma unroll_loop_end
 }`);
   };
-  mat.customProgramCacheKey = () => "photo-v3";
+  mat.customProgramCacheKey = () => "photo-v4";
   mat.needsUpdate = true;
 }
 
@@ -622,6 +626,7 @@ function photoSetup(P) {
     probes: [C, ...[5, 20, 50].flatMap((d) => [at(0, 0, d), ...corners.map(([x, y]) => at(x, y, d))])] });
 }
 
+const depthAtlas = new THREE.WebGLRenderTarget(ATLAS_N * TILE, ATLAS_N * TILE, { depthTexture: new THREE.DepthTexture(ATLAS_N * TILE, ATLAS_N * TILE) });
 // Depth pass from each photo camera (the scene is static, so once per photo).
 function renderPhotoDepth(P, i) {
   const vf = 2 * Math.atan(Math.max(...P.corners.map(([, y]) => Math.abs(y))) * 1.1);
@@ -630,11 +635,14 @@ function renderPhotoDepth(P, i) {
   cam.position.copy(P.C); cam.quaternion.copy(P.quat); cam.updateMatrixWorld(); cam.updateProjectionMatrix();
   // aspect so the horizontal extent (corners, with distortion) is covered too
   cam.aspect = Math.max(...P.corners.map(([x]) => Math.abs(x))) * 1.1 / Math.tan(vf / 2); cam.updateProjectionMatrix();
-  P.depthRT = new THREE.WebGLRenderTarget(2048, 2048, { depthTexture: new THREE.DepthTexture(2048, 2048) });
   const on = photoU.photoOn.value; photoU.photoOn.value = 0; // never sample a depth texture while writing one
-  renderer.setRenderTarget(P.depthRT); renderer.render(scene, cam); renderer.setRenderTarget(null);
+  const t = photoU.photoTile.value[i];
+  depthAtlas.viewport.set(t.x * TILE, t.y * TILE, TILE, TILE); depthAtlas.scissor.copy(depthAtlas.viewport);
+  depthAtlas.scissorTest = true;
+  photoU.photoDepthAtlas.value = blank;   // unbind the atlas while writing to it (feedback loop otherwise)
+  renderer.setRenderTarget(depthAtlas); renderer.clear(); renderer.render(scene, cam); renderer.setRenderTarget(null);
   photoU.photoOn.value = on;
-  photoU.photoDepth.value[i] = P.depthRT.depthTexture;
+  photoU.photoDepthAtlas.value = depthAtlas.depthTexture;
   photoU.photoDepthMat.value[i].multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
 }
 const depthNF = () => photoU.depthNF.value;
