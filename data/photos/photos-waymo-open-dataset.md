@@ -4,6 +4,7 @@
 - Operator: Waymo LLC (Alphabet). A research release from Waymo's fleet, which includes both manual and autonomous driving.
 - Access: sign in with a Google account, accept the license, then download from Google Cloud Storage (`gsutil` or the web console).
 - Cost: free.
+- Example, End-to-End camera data: [`waymo_open_dataset_end_to_end_camera_v_1_0_0`](https://console.cloud.google.com/storage/browser/waymo_open_dataset_end_to_end_camera_v_1_0_0;tab=objects?prefix=&forceOnObjectsSortingFiltering=false) (Google Cloud Storage console; needs the sign-in above). Reference link only: nothing downloaded or inspected yet.
 
 ## Datasets (checked 2026-11-27)
 
