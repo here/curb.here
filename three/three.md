@@ -213,6 +213,11 @@ The toggles are stored in the URL hash: `ph=f`, `ph=m` or `ph=fm`, plus `poff=2`
 - How it was chosen: the closest date with a different direction and the cafe in frame. The same-day frames from photo 1's sequence were rejected as too similar.
 - Photos viewed so far: 3 (photo 1, the rejected same-day frame, and photo 2).
 
+**Photo 3:** Mapillary [3898074213645371](https://www.mapillary.com/app/?pKey=3898074213645371), by sarawabreus, 2016-03-25 (iPhone 6s), CC BY-SA 4.0.
+- It was taken on Parkman Avenue, about 225 m southwest of the signal, looking northeast up Parkman toward the intersection (heading 55.7°, pitch +8.1°).
+- Picked by metadata only (nearest date to photos 1 and 2 among those on Parkman) and **not checked in the viewer**, so its pose and the 1.2 m camera height guess are unverified. Photos 1 and 2 face Sunset.
+- It sits at the edge of the model, so little of its view lands on modelled surfaces.
+
 **How it works**
 - `scripts/photo_to_scene.py ID…` fetches the pose and a 2048 px image into `docs/sunset/photos/` and `data/photos.json`.
 - Pose comes from Mapillary SfM: `computed_rotation` (angle-axis, ENU → camera) and `computed_geometry`. Checks: the forward vector gives heading 144.2°, matching `computed_compass_angle`, with pitch +1.6° and roll −4.3°. The position lands in the rightmost eastbound lane of the model's Sunset, which matches what the photo shows.
