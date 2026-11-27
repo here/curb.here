@@ -202,7 +202,7 @@ Where photos overlap, **the first photo in `photos.json` that sees a surface win
 
 Numbered checkboxes (**1**, **2**, …) turn individual photos on or off. The number is also the precedence order, and flat mode labels each vantage with its number.
 
-The toggles are stored in the URL hash: `ph=f`, `ph=m` or `ph=fm`, plus `poff=2` for photos switched off. "Jump to… → Photo vantage" puts the camera at the photo's position, orientation (including roll) and vertical FOV. For example, `#v=street&ph=m&at=963797397764501`.
+The toggles are stored in the URL hash: `ph=f`, `ph=m` or `ph=fm`, plus `poff=2` for photos switched off. "Jump to… → Photo vantage" puts the camera **10 ft (3 m) behind** the photo's position (along its horizontal look direction, same height), so the frame can see around the photo's edges, orientation (including roll) and vertical FOV. For example, `#v=street&ph=m&at=963797397764501`.
 
 **Photo 1:** Mapillary [963797397764501](https://www.mapillary.com/app/?pKey=963797397764501), by gyllen, 2016-01-30, CC BY-SA 4.0.
 - It's the oldest usable photo near the intersection; the area has photos from 2016, 2018, 2019, 2022, 2023 and 2026.

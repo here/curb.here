@@ -702,12 +702,16 @@ function buildFlat(P) {
   P.flat = g0;
 }
 
+const VANTAGE_BACK = 3.048;   // 10 ft: stand behind the photo's camera so the frame can see around the photo's edges
 function goVantage(P) {
-  if (TOUCH) {   // no street view here: stand the orbit camera at the photo, looking where it looked
+  const f = new THREE.Vector3(P.fwd.x, 0, P.fwd.z).normalize();       // photo's horizontal look direction
+  const x = P.p[0] - f.x * VANTAGE_BACK, z = P.p[1] - f.z * VANTAGE_BACK;
+  const absEye = P.C.y;                                                // keep the photo's absolute camera height
+  if (TOUCH) {   // no street view here: put the orbit camera there, looking where the photo looked
     const t = P.C.clone().addScaledVector(P.fwd, 10);
-    return setMode("orbit", { pos: P.C.toArray(), target: t.toArray(), fov: P.vfov });
+    return setMode("orbit", { pos: [x, absEye, z], target: t.toArray(), fov: P.vfov });
   }
-  setMode("street", { x: P.p[0], z: P.p[1], vantage: { id: P.id, eye: P.h, quat: P.quat, fov: P.vfov } });
+  setMode("street", { x, z, vantage: { id: P.id, eye: absEye - ground(x, z), quat: P.quat, fov: P.vfov } });
 }
 
 function applyPhotoToggles() {
