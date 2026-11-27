@@ -16,6 +16,18 @@
   - The legacy host `api.openstreetcam.org` times out.
 - Photo fields include `id`, `sequenceId`, `shotDate`, `dateAdded`, `lat`, `lng`, and `autoImgProcessingResult` (BLURRED).
 
+## Authentication (OSM OAuth 2 → KartaView token)
+- Docs: https://kartaview.org/doc/user-login-authorization · https://kartaview.org/doc/authentication
+- Steps:
+  1. Get an OSM OAuth 2 token (scope `read_prefs`).
+  2. `POST https://api.kartaview.org/auth/openstreetmap/client_auth` with `request_token=<osm token>&secret_token=undefined`.
+  3. This returns a long-lived KartaView `access_token`. The docs disagree on how to send it (`Access-Token` header, `X-Auth-Token` header, or an `access_token` parameter).
+- OSM only supports the authorization code flow, so one browser approval is always required. A client secret alone can't skip it.
+- Our setup: a **public** OSM app (no secret) using PKCE and the redirect URI `urn:ietf:wg:oauth:2.0:oob` (OSM shows the code; you paste it).
+  No callback server or Cloudflare Worker is needed.
+- Run `python3 -I scripts/kartaview_login.py` once; it saves `KARTAVIEW_ACCESS_TOKEN` to `.env`.
+- TODO: after login, retest the endpoints that returned "Restricted access!" (`/2.0/sequence/`, photo search by `tLeft`/`bRight`).
+
 ## Browser data source
 - Example Silver Lake view: https://kartaview.org/map/@34.07717906271594,-118.28228247976563,17z
 
