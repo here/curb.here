@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake OSM data for the Sunset & Silver Lake intersection into site/sunset/data/scene.json.
+"""Bake OSM data for the Sunset & Silver Lake intersection into docs/sunset/data/scene.json.
 
 Usage:
   scripts/osm_to_scene.py                 # fetch via scripts/overpass.sh, cache raw JSON, bake
@@ -55,6 +55,64 @@ def densify(pts, step=DENSIFY):
         n = max(1, math.ceil(math.hypot(x1 - x0, z1 - z0) / step))
         out += [(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n) for i in range(1, n + 1)]
     return out
+
+
+def rect():
+    x0, z1 = proj(BBOX[0], BBOX[1]); x1, z0 = proj(BBOX[2], BBOX[3])
+    return x0, z0, x1, z1
+
+
+def inside(p, R):
+    return R[0] <= p[0] <= R[2] and R[1] <= p[1] <= R[3]
+
+
+def clip_line(pts, R):
+    """Clip a polyline to rectangle R; returns a list of pieces (Liang-Barsky per segment)."""
+    pieces, cur = [], []
+    for a, b in zip(pts, pts[1:]):
+        t0, t1 = 0.0, 1.0
+        dx, dz = b[0] - a[0], b[1] - a[1]
+        ok = True
+        for p_, q_ in ((-dx, a[0] - R[0]), (dx, R[2] - a[0]), (-dz, a[1] - R[1]), (dz, R[3] - a[1])):
+            if p_ == 0:
+                if q_ < 0: ok = False; break
+            else:
+                t = q_ / p_
+                if p_ < 0: t0 = max(t0, t)
+                else: t1 = min(t1, t)
+        if not ok or t0 > t1:
+            if len(cur) > 1: pieces.append(cur)
+            cur = []; continue
+        A = (a[0] + t0 * dx, a[1] + t0 * dz); B = (a[0] + t1 * dx, a[1] + t1 * dz)
+        if not cur: cur = [A]
+        cur.append(B)
+        if t1 < 1:
+            pieces.append(cur); cur = []
+    if len(cur) > 1: pieces.append(cur)
+    return pieces
+
+
+def clip_poly(pts, R):
+    """Sutherland-Hodgman clip of a polygon ring (no closing vertex) to rectangle R."""
+    def cut(poly, inside_fn, inter):
+        out = []
+        for i, cur in enumerate(poly):
+            prev = poly[i - 1]
+            if inside_fn(cur):
+                if not inside_fn(prev): out.append(inter(prev, cur))
+                out.append(cur)
+            elif inside_fn(prev):
+                out.append(inter(prev, cur))
+        return out
+    def ix(xv):
+        return lambda a, b: (xv, a[1] + (b[1] - a[1]) * (xv - a[0]) / (b[0] - a[0]))
+    def iz(zv):
+        return lambda a, b: (a[0] + (b[0] - a[0]) * (zv - a[1]) / (b[1] - a[1]), zv)
+    for f, i in ((lambda p: p[0] >= R[0], ix(R[0])), (lambda p: p[0] <= R[2], ix(R[2])),
+                 (lambda p: p[1] >= R[1], iz(R[1])), (lambda p: p[1] <= R[3], iz(R[3]))):
+        pts = cut(pts, f, i)
+        if not pts: break
+    return pts
 
 
 def r2(p):
@@ -152,56 +210,72 @@ def bake(elements):
     terrain["source"] = "IDW of LA County building ele (OSM), 12 nearest"
     H = sampler(terrain)
 
+    def bake_way(e, t, pts):
+        hw = t.get("highway")
+        if "building" in t:
+            kind = t["building"]
+            h = num(t.get("height")); g = h is None
+            if g:
+                hb = GUESSES["building_height"]
+                h = hb.get(kind, hb["default"])
+            if pts[0] == pts[-1]:
+                pts = pts[:-1]
+            b = {"id": e["id"], "ring": [r2(p) for p in pts], "h": round(h, 2), "kind": kind}
+            if g: b["guessed"] = True
+            if t.get("name"): b["name"] = t["name"]
+            buildings.append(b)
+        elif hw in ROAD_CLASSES:
+            w, f, b, bike, park = road_profile(t)
+            line = densify(pts)
+            r = {"id": e["id"], "line": [r2(p) for p in line], "w": w, "f": f, "b": b,
+                 "bike": bike, "park": park, "kind": hw, "guessed": True}
+            if t.get("name"): r["name"] = t["name"]
+            if t.get("bridge") == "yes":
+                r["bridge"] = True
+                ya, yb = H(*line[0]), H(*line[-1])
+                r["y"] = [round(ya + (yb - ya) * i / max(1, len(line) - 1), 2)
+                          for i in range(len(line))]
+            for k in ("turn:lanes:forward", "turn:lanes:backward"):
+                if k in t: r[k.replace("turn:lanes:", "turn_")] = t[k]
+            roads.append(r)
+        elif hw == "footway" and t.get("footway") == "sidewalk":
+            sidewalks.append({"id": e["id"], "line": densify(pts), "bridge": t.get("bridge") == "yes"})
+        elif hw == "footway" and t.get("footway") == "crossing":
+            crossings.append({"id": e["id"], "line": [r2(p) for p in densify(pts, 1.0)],
+                              "markings": t.get("crossing:markings", "unknown")})
+        elif hw in ("footway", "path", "pedestrian", "steps"):
+            footways.append({"id": e["id"], "line": [r2(p) for p in densify(pts)],
+                             "kind": hw, "w": GUESSES["steps_width" if hw == "steps" else "footway_width"]})
+        elif pts[0] == pts[-1] and (t.get("leisure") or t.get("landuse") or t.get("natural")):
+            kind = t.get("leisure") or t.get("landuse") or t.get("natural")
+            areas.append({"id": e["id"], "ring": [r2(p) for p in pts[:-1]], "kind": kind,
+                          **({"name": t["name"]} if t.get("name") else {})})
+
+    def bake_node(e, t):
+        p = proj(e["lat"], e["lon"])
+        if t.get("kerb"):
+            kerbs.append({"id": e["id"], "p": r2(p), "kind": t["kerb"],
+                          "tactile": t.get("tactile_paving") == "yes"})
+        if t.get("highway") == "traffic_signals":
+            signals.append({"id": e["id"], "p": r2(p)})
+
+    R = rect()
     for e in elements:
-        t = e.get("tags", {}); typ = e["type"]
-        if typ == "way" and "geometry" in e:
-            pts = [proj(p["lat"], p["lon"]) for p in e["geometry"]]
-            hw = t.get("highway")
-            if "building" in t:
-                kind = t["building"]
-                h = num(t.get("height")); g = h is None
-                if g:
-                    hb = GUESSES["building_height"]
-                    h = hb.get(kind, hb["default"])
-                if pts[0] == pts[-1]:
-                    pts = pts[:-1]
-                b = {"id": e["id"], "ring": [r2(p) for p in pts], "h": round(h, 2), "kind": kind}
-                if g: b["guessed"] = True
-                if t.get("name"): b["name"] = t["name"]
-                buildings.append(b)
-            elif hw in ROAD_CLASSES:
-                w, f, b, bike, park = road_profile(t)
-                line = densify(pts)
-                r = {"id": e["id"], "line": [r2(p) for p in line], "w": w, "f": f, "b": b,
-                     "bike": bike, "park": park, "kind": hw, "guessed": True}
-                if t.get("name"): r["name"] = t["name"]
-                if t.get("bridge") == "yes":
-                    r["bridge"] = True
-                    ya, yb = H(*line[0]), H(*line[-1])
-                    r["y"] = [round(ya + (yb - ya) * i / max(1, len(line) - 1), 2)
-                              for i in range(len(line))]
-                for k in ("turn:lanes:forward", "turn:lanes:backward"):
-                    if k in t: r[k.replace("turn:lanes:", "turn_")] = t[k]
-                roads.append(r)
-            elif hw == "footway" and t.get("footway") == "sidewalk":
-                sidewalks.append({"id": e["id"], "line": densify(pts), "bridge": t.get("bridge") == "yes"})
-            elif hw == "footway" and t.get("footway") == "crossing":
-                crossings.append({"id": e["id"], "line": [r2(p) for p in densify(pts, 1.0)],
-                                  "markings": t.get("crossing:markings", "unknown")})
-            elif hw in ("footway", "path", "pedestrian", "steps"):
-                footways.append({"id": e["id"], "line": [r2(p) for p in densify(pts)],
-                                 "kind": hw, "w": GUESSES["steps_width" if hw == "steps" else "footway_width"]})
-            elif pts[0] == pts[-1] and (t.get("leisure") or t.get("landuse") or t.get("natural")):
-                kind = t.get("leisure") or t.get("landuse") or t.get("natural")
-                areas.append({"id": e["id"], "ring": [r2(p) for p in pts[:-1]], "kind": kind,
-                              **({"name": t["name"]} if t.get("name") else {})})
-        elif typ == "node":
-            p = proj(e["lat"], e["lon"])
-            if t.get("kerb"):
-                kerbs.append({"id": e["id"], "p": r2(p), "kind": t["kerb"],
-                              "tactile": t.get("tactile_paving") == "yes"})
-            if t.get("highway") == "traffic_signals":
-                signals.append({"id": e["id"], "p": r2(p)})
+        t = e.get("tags", {})
+        if e["type"] == "way" and "geometry" in e:
+            full = [proj(p["lat"], p["lon"]) for p in e["geometry"]]
+            if "building" in t:   # keep whole buildings whose centroid is inside
+                cx = sum(p[0] for p in full) / len(full); cz = sum(p[1] for p in full) / len(full)
+                parts = [full] if inside((cx, cz), R) else []
+            elif full[0] == full[-1] and "highway" not in t:   # areas: clip polygon
+                ring = clip_poly(full[:-1], R)
+                parts = [ring + ring[:1]] if len(ring) >= 3 else []
+            else:   # lines: clip, possibly into several pieces
+                parts = [densify(pc) for pc in clip_line(full, R)]
+            for pts in parts:
+                bake_way(e, t, pts)
+        elif e["type"] == "node" and inside(proj(e["lat"], e["lon"]), R):
+            bake_node(e, t)
 
     # sidewalk width from the nearest road class
     for s in sidewalks:
@@ -268,7 +342,7 @@ def bake(elements):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--osm", help="saved Overpass JSON (out tags geom)")
-    ap.add_argument("--out", default=os.path.join(ROOT, "site/sunset/data/scene.json"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "docs/sunset/data/scene.json"))
     a = ap.parse_args()
     if a.osm:
         raw = open(a.osm).read()

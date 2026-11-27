@@ -21,19 +21,19 @@ One query returned 532 elements (buildings, highways, crossings, kerbs, signals,
 | Green | Laurel and Hardy Park, plus 3 swimming pools. | Use flat colored polygons. |
 | Trees, lamps, poles | **None mapped** (0 `natural=tree`). | Leave them out or add a few by hand; see "Later" below. |
 
-Attribution, shown on the page: **© OpenStreetMap contributors, ODbL 1.0**. If we use overpass.ch elevation, credit its source too.
+Attribution, shown on the page: **© OpenStreetMap contributors, ODbL 1.0**.
 
 ## Architecture
 ```
-scripts/osm_to_scene.py   (offline; runs scripts/overpass.sh)
-        │  Overpass JSON, plus an elevation grid
+scripts/osm_to_scene.py   (offline; runs scripts/overpass.sh; raw JSON cached in three/cache/, gitignored)
+        │  Overpass JSON → terrain from building ele, clipped to the bbox
         ▼
-site/sunset/data/scene.json   (projected to local metres, simplified, committed)
+docs/sunset/data/scene.json   (projected to local metres, committed, ~145 KB)
         │
-site/sunset/index.html + main.js   (three.js from a CDN through an import map; no build step)
-        │  GitHub Pages (Actions deploy of site/)
+docs/sunset/index.html + main.js   (three.js 0.170.0 from jsDelivr through an import map; no build step)
+        │  GitHub Pages: branch main, folder /docs
         ▼
-https://<gh-user>.github.io/<repo>/sunset/
+https://here.github.io/curb.here/sunset/
         │  Cloudflare Worker (wrangler), route curb.here/sunset*
         ▼
 https://curb.here/sunset/
@@ -41,7 +41,8 @@ https://curb.here/sunset/
 
 **Bake the data offline. The browser must never call Overpass.** The overpass.ch key is in the URL path, and anything sent to the browser is public. Baking also keeps the page fast and stable when Overpass is overloaded.
 
-### Data pipeline (`scripts/osm_to_scene.py`, to write)
+### Data pipeline (`scripts/osm_to_scene.py`)
+Run `scripts/osm_to_scene.py` to fetch and bake, or `scripts/osm_to_scene.py --osm three/cache/osm.json` to re-bake from the cached extract with no network.
 1. Fetch the focus bbox using `scripts/overpass.sh` with `out tags geom;`. That returns way geometry inline, so there's no node join. The query is the one used above:
    ```
    [out:json][timeout:90][bbox:34.0811,-118.2757,34.0847,-118.2714];
@@ -49,7 +50,11 @@ https://curb.here/sunset/
     node["natural"="tree"];way["landuse"];way["leisure"];way["natural"];node["kerb"];way["barrier"];);
    out tags geom;
    ```
-2. Fetch an elevation grid: about 10 m spacing over the bbox (roughly 40×40 points) from overpass.ch elevation (`elevation_points`; also available through the MCP server). Store it as a heightfield. Building `ele` values are a cross-check.
+2. Terrain: an 8 m grid (51×51) **interpolated from the building `ele` values** (inverse-distance weighting over the 12 nearest of the 304 buildings).
+   - Why not overpass.ch elevation? Outside Switzerland it serves Copernicus GLO-30, a 30 m *surface* model that includes roofs and trees, which would put bumps under every building. It would also use up the API quota.
+   - The LA County `ele` is ground elevation at each building, which is denser and closer to the real ground.
+   - Weak spots: the middle of wide streets and the park, where there are no buildings. A real DTM (USGS 3DEP 1 m lidar) would fix that later.
+   - Geometry is clipped to the bbox (Liang–Barsky for lines, Sutherland–Hodgman for areas). Buildings are kept whole when their centroid is inside, which leaves 288.
 3. Project to local metres: east, north and up, with the origin at the main signal node. At this scale an equirectangular tangent plane is fine:
    ```
    lat0 = 34.0829333, lon0 = -118.273334
@@ -57,12 +62,13 @@ https://curb.here/sunset/
    z = -(lat - lat0) * 110574                  # three.js: -z is north
    y =  elevation(x, z) - elevation(0, 0)      # up, relative to the intersection
    ```
-4. Emit a compact `scene.json` with these keys: `buildings[] {ring, base, height, kind}`, `roads[] {line, width, lanes, kind, layer, bridge}`, `sidewalks[]`, `crossings[] {line, markings}`, `kerbs[] {pos, kind}`, `signals[]`, `areas[] {ring, kind}` and `terrain {nx, nz, cell, heights[]}`. Round coordinates to 0.01 m. Keep the OSM ids so you can click through to openstreetmap.org.
+4. Emit a compact `scene.json` with these keys: `terrain {x0, z0, cell, nx, nz, heights[]}`, `buildings[] {id, ring, h, kind}`, `roads[] {id, line, w, f, b, bike, park, kind, bridge?, y?}`, `sidewalks[] {line, w}`, `crossings[] {line, markings}`, `footways[]`, `areas[] {ring, kind}`, `kerbs[] {p, kind, tactile}`, `signals[]`, `poles[] {p, toward}`, `labels[]`, `pois[]`, and `meta` (origin, bake date, attribution and the guess table). Lines are densified to 4 m so they follow the terrain. Coordinates are rounded to 0.01 m, and OSM ids are kept.
 5. Add a line to `meta/` noting the extract date, because OSM changes.
 
 ## Building the scene in three.js
 - **Loading:** use an `<script type="importmap">` that points `three` and `three/addons/` at a **pinned** version on jsDelivr or unpkg, for example `https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js`. Don't use a bare `three@latest`. There is no bundler, so GitHub Pages can serve the repo files as they are.
-- **Terrain:** a `PlaneGeometry(w, d, nx-1, nz-1)` with its vertex heights set from the grid. Use a neutral ground color, with slightly darker vertex colors for slope.
+- **Terrain:** a `PlaneGeometry(w, d, nx-1, nz-1)` with its vertex heights set from the grid.
+  - It's drawn **25 cm below** the sampled ground. Mesh triangles don't match bilinear sampling, so on slopes the terrain would otherwise poke through the draped roads.
 - **Buildings:** for each footprint, use `THREE.Shape` and `ExtrudeGeometry({depth: height, bevelEnabled: false})`, rotated so the extrusion points up.
   - On a slope, put the base at the **lowest** terrain sample under the footprint, so there's no floating front edge. Add the extra height on top so the roofline stays right.
   - Color by `building=*`: house/residential stucco, apartments slightly darker, retail/commercial with a ground-floor band.
@@ -111,73 +117,61 @@ Each guess lives in **one table in the pipeline**, and every guessed value is fl
 
 ## Hosting: GitHub Pages behind curb.here/sunset
 ### GitHub Pages
-- Publish only `site/` with the **Actions** Pages workflow (`actions/upload-pages-artifact` with `path: site`, then `actions/deploy-pages`). Notes, scripts and `.env.example` stay out of the published site.
-- Free GitHub Pages needs a **public repo**, or a paid plan for private repos. Check this repo before turning Pages on.
-- The site ends up at `https://<gh-user>.github.io/<repo>/sunset/`.
+- The repo is public, and Pages deploys from **branch `main`, folder `/docs`** (set up 2026-11-27). Only `docs/` is published; notes and scripts are not.
+  `docs/index.html` is the root page, owned by another session. The 3D view lives in `docs/sunset/`.
+- The site is at https://here.github.io/curb.here/sunset/ and updates a minute or so after each push.
 - **Use only relative URLs** in the page (`./main.js`, `./data/scene.json`), so the same files work from both the github.io path and `curb.here/sunset/`.
 - Don't set a GitHub Pages custom domain. curb.here is served by the Worker, not by a Pages CNAME.
 
 ### Cloudflare Worker (`worker/`, deployed with wrangler)
 Requirement: `curb.here` is a zone on the Cloudflare account, with DNS proxied (orange cloud).
 
-`worker/wrangler.toml`:
-```toml
-name = "curb-here-sunset"
-main = "src/index.js"
-compatibility_date = "2026-11-01"
-routes = [{ pattern = "curb.here/sunset*", zone_name = "curb.here" }]
+The Worker is in [`worker/wrangler.toml`](../worker/wrangler.toml) and [`worker/src/index.js`](../worker/src/index.js). It:
+- proxies `curb.here/sunset*` to `https://here.github.io/curb.here/sunset*`, for `GET`/`HEAD` only;
+- redirects `/sunset` to `/sunset/`, because the page's relative URLs need the trailing slash;
+- rewrites GitHub `Location` headers back onto curb.here;
+- caches at the edge for 5 minutes and strips GitHub/Fastly headers.
 
-[vars]
-UPSTREAM = "https://<gh-user>.github.io/<repo>"
-```
+Tested locally with Node against the real upstream: `/sunset` gives 301 → `/sunset/`, and the other paths pass through.
 
-`worker/src/index.js`:
-```js
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/sunset") {                  // need the trailing slash so relative URLs resolve
-      return Response.redirect(`${url.origin}/sunset/${url.search}`, 301);
-    }
-    const upstream = new URL(env.UPSTREAM + url.pathname + url.search);   // /sunset/... -> /<repo>/sunset/...
-    const resp = await fetch(upstream, {
-      headers: { "User-Agent": "curb.here-worker" },
-      cf: { cacheEverything: true, cacheTtl: 300 },
-    });
-    const out = new Response(resp.body, resp);         // copy so we can edit headers
-    out.headers.delete("x-github-request-id");
-    out.headers.set("x-served-by", "curb.here-worker");
-    return out;
-  },
-};
+Deploy:
+```bash
+cd worker
+export CLOUDFLARE_API_TOKEN=...   # token with Workers Scripts:Edit + Workers Routes:Edit (zone curb.here); keep it in .env, never commit
+npx wrangler deploy
+curl -I https://curb.here/sunset/
 ```
-Deploy with `cd worker && npx wrangler login && npx wrangler deploy`, then check `curl -I https://curb.here/sunset/`.
 
 - GitHub Pages sends `Cache-Control: max-age=600`. After a deploy, wait up to 10 minutes, or purge the Cloudflare cache.
-- A GitHub Pages redirect (for example, a missing trailing slash) would send `Location: https://<gh-user>.github.io/...`. The `/sunset` → `/sunset/` redirect above covers the main case. If more show up, rewrite `Location` headers in the Worker.
 - Other paths on curb.here aren't touched by this route.
 - No secrets are involved: the Worker only proxies public static files.
 
-## Suggested layout
+## Layout
 ```
 three/three.md              this file
-scripts/osm_to_scene.py     Overpass + elevation → site/sunset/data/scene.json
-site/sunset/index.html      import map, canvas, UI (mode toggle, presets, attribution)
-site/sunset/main.js         scene build + controls
-site/sunset/data/scene.json baked data (committed; small)
+three/cache/osm.json        raw Overpass extract (gitignored)
+scripts/osm_to_scene.py     Overpass → docs/sunset/data/scene.json
+docs/sunset/index.html      import map, UI (mode toggle, presets, attribution)
+docs/sunset/main.js         scene build + controls
+docs/sunset/data/scene.json baked data (committed)
 worker/wrangler.toml, worker/src/index.js
-.github/workflows/pages.yml
 ```
+To view locally, run `python3 -m http.server -d docs 8000` and open http://localhost:8000/sunset/.
 
 ## Steps
-In progress (session "three", 2026-11-27): pipeline, first view, Pages workflow and Worker files.
-- [ ] `scripts/osm_to_scene.py`: extract, project and write `scene.json`. Commit the first bake.
-- [ ] Elevation grid from overpass.ch, cross-checked against building `ele`.
-- [ ] `site/sunset/`: terrain, buildings, roads, then orbit controls. That's the first visible milestone.
-- [ ] Sidewalks, curbs, ramps and crosswalks (the curb detail).
-- [ ] Street-view mode, preset spots and URL-hash views.
-- [ ] Pages workflow, Worker and wrangler deploy. Confirm `https://curb.here/sunset/` loads.
+- [x] `scripts/osm_to_scene.py`: extract, clip, project and terrain; first bake committed (2026-11-27).
+- [x] `docs/sunset/`: terrain, buildings, roads with lane lines, sidewalks with curb faces, crosswalks, guessed signal poles, labels and shadows.
+- [x] Orbit and street-view modes, presets (overview, four corners, Cafe Tropical, the bridge) and shareable URL-hash views.
+- [x] Worker code tested locally.
+- [ ] Deploy the Worker (waiting on a Cloudflare API token and curb.here as a Cloudflare zone). Then confirm `https://curb.here/sunset/` loads.
+- [ ] Curb ramps at `kerb=lowered` nodes. Today only tactile pads are drawn, and the sidewalk slab is raised everywhere.
+- [ ] Junction areas: lane lines stop 7 m short of each way's end, and the junction box isn't drawn as its own surface yet.
+- [ ] Road widths from the gap between the mapped sidewalks, instead of lane counts.
+- [ ] Turn arrows from `turn:lanes:*`.
+- [ ] Touch movement in street view. Drag-to-look works on phones, but walking needs keys.
+- [ ] Hide far labels. CSS labels show through buildings.
 - [ ] Find out what passes under the Sunset bridge (way 30528196) and fix the bridge model.
+- [ ] Better ground: USGS 3DEP 1 m DTM instead of building `ele`.
 
 ## Later (not now)
 - Field photos: put Mapillary, KartaView and Panoramax images in the scene as clickable billboards at their capture points and headings, and use them to check the guesses (lane widths, signal positions, trees).
