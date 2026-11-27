@@ -13,7 +13,7 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 | Software | Open source (MIT), self-hostable | Partly open (apps/tools); backend proprietary | Proprietary (MapillaryJS viewer + SDKs are open source) |
 | Image license | Set per instance — CC-BY-SA 4.0 / etalab-2.0 / mixed | CC-BY-SA 4.0 | CC-BY-SA 4.0 (plus an OSM-derivation permission) |
 | API | STAC + OGC API, **no key**, CORS open; meta-catalog `api.panoramax.xyz` | REST API, keyless public endpoints | Graph API v4 + vector tiles, **needs a free access token** |
-| US / LA coverage | **Very thin** — 1 photo in the Silver Lake bbox (Jan 2024) as of 2026-11-27 | Thin and patchy; not yet measured (API unreachable during the 2026-11-27 test) | **Best by far** — the de facto open source of US street imagery |
+| US / LA coverage | **Very thin** — 1 photo in the Silver Lake bbox (Jan 2024) as of 2026-11-27 | **Moderate, dated** — ≥376 photos / 67 sequences in the bbox, 2016–2022 (mostly 2019) | **Best by far** — the de facto open source of US street imagery |
 | Data ownership risk | Low — data can be mirrored, or we run our own instance | Medium — one company, little activity | Medium — one big company, terms can change |
 | Upload / capture | Web upload, CLI, mobile apps; any geotagged JPEG / 360° | KartaView mobile app, dashcam/CLI upload tools | Mapillary app, desktop uploader, `mapillary_tools` CLI, GoPro/360° support |
 | Derived data | Some auto-blurring; little feature detection | Detects signs, lanes and road geometry | Extensive ML detections (signs, objects, segmentation) available as vector tiles |
@@ -29,7 +29,8 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 
 ### KartaView
 - **Pro:** CC-BY-SA, keyless API, road-feature detection, good for dashcam-style sequences.
-- **Con:** low community momentum (app at ~3.2★, crash complaints); the API can be flaky (failed for us).
+- **Pro:** real Silver Lake coverage (≥376 photos, 67 sequences). Good for a historical (2016–2022) view.
+- **Con:** nothing captured after 2022; low community momentum (app at ~3.2★, crash complaints); bbox and sequence endpoints are restricted.
 - **Con:** owned by one company, which could change priorities.
 
 ### Mapillary
@@ -41,14 +42,15 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 ## Recommendation (initial)
 1. **Read from Mapillary** for existing Silver Lake imagery (largest corpus).
 2. **Contribute to Panoramax** (and optionally mirror to Mapillary) for any new field photos, so the data stays truly open and portable.
-3. Treat KartaView as a secondary source; re-test coverage once the API is reachable.
+3. Use KartaView as a secondary, historical source (2016–2022). It is useful for before/after comparisons.
 
 ## Open questions / TODO
 - [ ] Get a Mapillary token and count images and sequences in the bbox.
-- [ ] Retry the KartaView coverage query.
+- [x] KartaView coverage measured (2026-11-27).
 - [ ] Decide whether to self-host a Panoramax instance or upload to an existing one.
 
 ## Sources
+- KartaView map, Silver Lake: https://kartaview.org/map/@34.07717906271594,-118.28228247976563,17z
 - https://en.wikipedia.org/wiki/Panoramax · https://wiki.openstreetmap.org/wiki/Panoramax
 - https://github.com/jonfroehlich/streetscape-tracker/issues/316 (Panoramax instance stats, Sep 2026)
 - https://en.wikipedia.org/wiki/KartaView · https://play.google.com/store/apps/details?id=com.telenav.streetview
