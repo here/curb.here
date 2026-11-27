@@ -12,9 +12,12 @@
 - Tooling: `mapillary` Python SDK, `mapillary_tools` (upload), MapillaryJS viewer, demo app https://github.com/mapillary/api-demo
 
 ## Silver Lake coverage
-- Not queried yet (no token). Expected to be the densest open source of imagery for LA.
+- Focus area around Cafe Tropical (2026-11-27): **1,515 images, 21 sequences, 216 panoramas, 7 contributors.**
+  - By year: 2016: 92, 2018: 852, 2019: 238, 2022: 66, 2023: 117, 2026: 150.
+- The Graph API rejects large bboxes ("reduce the amount of data"). `scripts/mapillary_coverage.py` handles this by tiling at 0.005° and splitting any tile that hits the cap.
 - App ID `29636584962603158` is registered. Credentials live in `.env` (gitignored; the template is `.env.example`).
-- Once `MAPILLARY_ACCESS_TOKEN` is set, run `scripts/mapillary-check.sh` to count images and sequences in the bbox.
+- Values in `.env` must be **quoted**: the token and secret contain `|`.
+- Run `scripts/mapillary_coverage.py [bbox]`.
 
 ## Pros / cons
 See [photos.md](photos.md#mapillary).

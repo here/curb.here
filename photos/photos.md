@@ -5,6 +5,17 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 - [KartaView](photos-kartaview.md)
 - [Mapillary (Meta)](photos-meta-mapillary.md)
 
+## Focus area: Cafe Tropical, Sunset & Silver Lake (tested 2026-11-27)
+Bbox `-118.2757,34.0811,-118.2714,34.0847` (~200 m around 2900 W Sunset Blvd).
+
+| | Images | Sequences | Years | Notes |
+|---|---|---|---|---|
+| **Mapillary** | **1,515** | 21 | 2016 (92), 2018 (852), 2019 (238), 2022 (66), 2023 (117), **2026 (150)** | 216 panoramas, 7 contributors; the only source with current imagery |
+| **KartaView** | 4 | 4 | 2019 | radius 200 m |
+| **Panoramax** | 0 | — | — | — |
+
+Run it again with `scripts/mapillary_coverage.py -118.2757,34.0811,-118.2714,34.0847`.
+
 ## Summary table
 
 | | **Panoramax** | **KartaView** | **Mapillary (Meta)** |
@@ -13,7 +24,7 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 | Software | Open source (MIT), self-hostable | Partly open (apps/tools); backend proprietary | Proprietary (MapillaryJS viewer + SDKs are open source) |
 | Image license | Set per instance — CC-BY-SA 4.0 / etalab-2.0 / mixed | CC-BY-SA 4.0 | CC-BY-SA 4.0 (plus an OSM-derivation permission) |
 | API | STAC + OGC API, **no key**, CORS open; meta-catalog `api.panoramax.xyz` | REST API, keyless public endpoints | Graph API v4 + vector tiles, **needs a free access token** |
-| US / LA coverage | **Very thin** — 1 photo in the Silver Lake bbox (Jan 2024) as of 2026-11-27 | **Moderate, dated** — ≥376 photos / 67 sequences in the bbox, 2016–2022 (mostly 2019) | **Best by far** — the de facto open source of US street imagery |
+| US / LA coverage | **Very thin** — 1 photo in the Silver Lake bbox (Jan 2024) as of 2026-11-27 | **Moderate, dated** — ≥376 photos / 67 sequences in the bbox, 2016–2022 (mostly 2019) | **Best by far** — 1,515 images near Cafe Tropical, including 2026 captures |
 | Data ownership risk | Low — data can be mirrored, or we run our own instance | Medium — one company, little activity | Medium — one big company, terms can change |
 | Upload / capture | Web upload, CLI, mobile apps; any geotagged JPEG / 360° | KartaView mobile app, dashcam/CLI upload tools | Mapillary app, desktop uploader, `mapillary_tools` CLI, GoPro/360° support |
 | Derived data | Some auto-blurring; little feature detection | Detects signs, lanes and road geometry | Extensive ML detections (signs, objects, segmentation) available as vector tiles |
@@ -45,7 +56,8 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 3. Use KartaView as a secondary, historical source (2016–2022). It is useful for before/after comparisons.
 
 ## Open questions / TODO
-- [ ] Get a Mapillary token and count images and sequences in the bbox.
+- [x] Mapillary token set up; focus area counted (2026-11-27).
+- [ ] Run the wider Silver Lake count (tiled, slow) only if needed.
 - [x] KartaView coverage measured (2026-11-27).
 - [ ] Decide whether to self-host a Panoramax instance or upload to an existing one.
 
