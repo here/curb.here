@@ -5,6 +5,8 @@ Services compared for open street-level imagery of Silver Lake, LA. Details per 
 - [KartaView](photos-kartaview.md)
 - [Mapillary (Meta)](photos-meta-mapillary.md)
 
+**Example images:** [examples.md](examples.md) (10 per service near Cafe Tropical)
+
 ## Focus area: Cafe Tropical, Sunset & Silver Lake (tested 2026-11-27)
 Bbox `-118.2757,34.0811,-118.2714,34.0847` (~200 m around 2900 W Sunset Blvd).
 
