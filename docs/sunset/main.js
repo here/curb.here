@@ -44,7 +44,7 @@ document.body.appendChild(labelRenderer.domElement);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
 const orbit = new OrbitControls(camera, renderer.domElement);
-Object.assign(orbit, { enableDamping: true, maxPolarAngle: 1.48, minDistance: 5, maxDistance: 600 });
+Object.assign(orbit, { panSpeed: 2, enableDamping: true, maxPolarAngle: 1.48, minDistance: 5, maxDistance: 600 });
 
 // ---- lights: late-afternoon sun from the west-southwest --------------------------------
 scene.add(new THREE.HemisphereLight(0xe8f1ff, 0x8a7d63, 1.1));

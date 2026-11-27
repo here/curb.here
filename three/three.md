@@ -88,7 +88,7 @@ Run `scripts/osm_to_scene.py` to fetch and bake, or `scripts/osm_to_scene.py --o
 ## Mouse navigation
 There are two modes, toggled by a button and the `V` key:
 1. **Orbit (default):** `OrbitControls` targeting the intersection.
-   - Left-drag rotates, right-drag pans, and the wheel zooms.
+   - Left-drag rotates, right-drag pans (at 2× the default speed), and the wheel zooms.
    - Clamp `maxPolarAngle` just below horizontal, `minDistance` to 5 m and `maxDistance` to 400 m, and turn on damping.
 2. **Street view ("stand on the curb"):** the camera sits at eye height (1.6 m above terrain).
    - Drag to look around, using `PointerLockControls` or a simple yaw/pitch drag handler. Drag is friendlier than pointer lock on trackpads and phones.
