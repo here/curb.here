@@ -361,7 +361,7 @@ function setMode(m, opts = {}) {
   $("mode").setAttribute("aria-pressed", String(m === "street"));
   $("mode").textContent = m === "street" ? "Orbit view" : "Street view";
   $("help").textContent = m === "street"
-    ? "Drag to look around · W/S walk · A/D turn (hold Right Shift or / to strafe) · Left Shift = faster · Space to jump · double-click ground to go there · V for orbit"
+    ? "Drag to look around · wheel zooms · W/S walk · A/D turn (hold Right Shift or / to strafe) · Left Shift = faster · Space to jump · double-click ground to go there · V for orbit"
     : "Drag to rotate · right-drag to pan · scroll to zoom · WASD / arrows to move · Q/E rotate · R/F tilt · +/− or PgUp/PgDn zoom (Left Shift = faster) · V for street view";
   if (m === "street") {
     if (opts.x === undefined) {
@@ -415,6 +415,15 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   drag = { x: e.clientX, y: e.clientY };
 });
 renderer.domElement.addEventListener("pointerup", () => { if (drag) { drag = null; saveHash(); } });
+
+// street-view wheel: zoom by narrowing / widening the field of view
+renderer.domElement.addEventListener("wheel", (e) => {
+  if (mode !== "street") return;
+  e.preventDefault();
+  leaveVantage(true);                                   // keep the photo's look direction and FOV, then adjust
+  camera.fov = THREE.MathUtils.clamp(camera.fov * Math.exp(e.deltaY * 0.001), 15, 100);
+  camera.updateProjectionMatrix();
+}, { passive: false });
 
 // double-click: jump (street) or focus (orbit)
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();

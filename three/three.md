@@ -98,6 +98,7 @@ There are two modes, toggled by a button and the `V` key:
 - Keyboard (built 2026-11-27):
   - Street view: W/S (or ↑/↓) walk at 8 m/s, or 28 m/s with Left Shift. A/D (or ←/→) **turn**; hold Right Shift or `/` to strafe instead. Space jumps (about 3 m up, then back to the ground).
   - Orbit: WASD or the arrow keys move over the ground (speed scales with zoom), Q/E rotate around the target, R/F tilt, and +/− or PgUp/PgDn zoom. Left Shift is 3× faster.
+  - Street view: the mouse wheel zooms by changing the field of view (15°–100°). Changing view mode or jumping resets it to 60°.
   - Walking away from a photo vantage keeps the photo's look direction.
 - Put the camera state in the URL hash, for example `#v=street&x=12.3&z=-4.0&yaw=90`, so a view can be shared as a link.
 
