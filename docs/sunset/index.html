@@ -12,12 +12,15 @@
   #ui { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: none; }
   #ui > * { pointer-events: auto; }
   h1 { font-size: 15px; margin: 0 8px 0 0; padding: 6px 10px; background: #fffd; border-radius: 6px; }
+  #ui > *, #ui button, #ui select, #ui label { box-sizing: border-box; height: 34px; }
+  #ui h1, #ui .pill { display: flex; align-items: center; }
+  #reset { width: 34px; padding: 0; display: flex; align-items: center; justify-content: center; }
   button, select { font: inherit; padding: 6px 10px; border: 1px solid #0003; border-radius: 6px; background: #fff; cursor: pointer; }
   button[aria-pressed="true"] { background: #1d2327; color: #fff; }
   #help { position: fixed; left: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); padding: 6px 10px; background: #fffd; border-radius: 6px; max-width: min(60ch, calc(100% - 40px)); }
   #attr { position: fixed; right: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); padding: 4px 8px; background: #fffd; border-radius: 6px; font-size: 12px; }
   #attr a { color: inherit; }
-  .toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toggles { display: contents; }   /* children join #ui's single wrapping row (no early line breaks) */
   .pill { padding: 6px 10px; background: #1d2327e6; color: #fff; border-radius: 6px; font-size: 13px; }
   .toggles label { display: flex; gap: 5px; align-items: center; padding: 5px 9px; background: #fff; border: 1px solid #0003; border-radius: 6px; cursor: pointer; user-select: none; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 16px; }
@@ -34,7 +37,7 @@
 <div id="loading">Loading Sunset &amp; Silver Lake…</div>
 <div id="ui">
   <h1>Sunset &amp; Silver Lake</h1>
-  <button id="reset" title="Reset to defaults and reload the page (also refreshes cached files)" aria-label="Reset and reload"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3.5v5h-5"/></svg></button>
+  <button id="reset" title="Reset to defaults and reload the page (also refreshes cached files)" aria-label="Reset and reload"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3.5v5h-5"/></svg></button>
   <button id="ui-toggle" aria-pressed="false" title="Show or hide the buttons">Show buttons</button>
   <span id="controls" class="toggles" hidden>
   <button id="mode" aria-pressed="false" title="Toggle orbit / street view (V)">Street view</button>
