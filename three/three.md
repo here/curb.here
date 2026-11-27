@@ -170,6 +170,7 @@ worker/wrangler.toml, worker/src/index.js
 ```
 
 ## Steps
+In progress (session "three", 2026-11-27): pipeline, first view, Pages workflow and Worker files.
 - [ ] `scripts/osm_to_scene.py`: extract, project and write `scene.json`. Commit the first bake.
 - [ ] Elevation grid from overpass.ch, cross-checked against building `ele`.
 - [ ] `site/sunset/`: terrain, buildings, roads, then orbit controls. That's the first visible milestone.
