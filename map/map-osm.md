@@ -5,11 +5,28 @@ OSM is open map data (ODbL 1.0). Overpass is a read-only query API for OSM data.
 ## Endpoints (try in this order)
 | Priority | Endpoint | Status from roady, 2026-11-27 |
 |---|---|---|
-| 1. Primary | https://overpass.private.coffee/api/interpreter | **Not responding.** The home page loads (HTTP 200), but `/api/interpreter` (GET and POST) and `/api/status` time out. Retry later. |
-| 2. Fallback | https://overpass-api.de/api/interpreter | **Works.** Small queries take about 37 s. Without a `User-Agent` header it returns **406 Not Acceptable**. |
-| 3. Last resort | https://nextgis.com/ | Site is up (HTTP 200). This isn't an Overpass interpreter URL: NextGIS offers OSM data extracts and a web GIS, so use it only if both Overpass servers fail. |
+| 1. Primary | `https://api.overpass.ch/v1/$OVERPASS_CH_API_KEY/interpreter` | Paid/keyed service. The key is in `.env` (`OVERPASS_CH_API_KEY`). Not tested yet. |
+| 2. Fallback | https://overpass.private.coffee/api/interpreter | **Times out (looks overloaded).** The home page loads, but `/api/interpreter` and `/api/status` hang. |
+| 3. Fallback | https://overpass-api.de/api/interpreter | **Often overloaded.** One query worked in about 37 s; others timed out. Without a `User-Agent` it returns **406 Not Acceptable**. |
+| 4. Last resort | https://nextgis.com/ | Site is up (HTTP 200). This isn't an Overpass interpreter URL: NextGIS offers OSM data extracts and a web GIS, so use it only if both Overpass servers fail. |
+
+## overpass.ch
+- Site: https://overpass.ch. It covers Overpass, plus map tiles, geocoding and elevation.
+- **The API key is part of the URL path.** Never commit, log or paste a full overpass.ch URL; build it from `OVERPASS_CH_API_KEY` at runtime.
+  - Interpreter: `https://api.overpass.ch/v1/<key>/interpreter` (POST or GET with `data=<query>`)
+  - MCP server: `https://api.overpass.ch/v1/<key>/mcp` (guide: https://overpass.ch/guides/overpass-mcp-server)
+- Plans (as listed on the site, 2026-11):
+  - Free: 10,000 Overpass queries a month, **non-commercial only**.
+  - Overpass API plan: from $25/mo, 100,000 queries a month, 2 parallel queries.
+- Claude Code MCP: register it in **local** scope so the key stays out of the repo (it's stored in `~/.claude.json`):
+  ```bash
+  set -a; . ./.env; set +a
+  claude mcp add --transport http -s local overpass "https://api.overpass.ch/v1/${OVERPASS_CH_API_KEY}/mcp"
+  ```
+  Don't add it to a committed `.mcp.json`.
 
 ## Usage notes
+- Use `scripts/overpass.sh 'QUERY'`. It tries the endpoints in priority order and never prints the key.
 - Always send a generic `User-Agent` (e.g. `curb.here-research`). Don't send personal details.
 - Use `[timeout:N]` and a global `[bbox:S,W,N,E]` to keep queries small. Note that Overpass bbox order is **lat,lon** (south, west, north, east).
 - Set a long client timeout (60–120 s), and on a timeout move down the endpoint list.
@@ -19,9 +36,7 @@ OSM is open map data (ODbL 1.0). Overpass is a read-only query API for OSM data.
 Q='[out:json][timeout:90][bbox:34.0811,-118.2757,34.0847,-118.2714];
 (nwr["amenity"];nwr["shop"];nwr["highway"~"crossing|traffic_signals|bus_stop"];way["highway"];way["building"];);
 out center tags;'
-for h in https://overpass.private.coffee/api/interpreter https://overpass-api.de/api/interpreter; do
-  curl -sf -m 120 -A "curb.here-research" "$h" --data-urlencode "data=$Q" -o osm.json && break
-done
+scripts/overpass.sh "$Q" > osm.json
 ```
 
 ## Focus area: Cafe Tropical (tested 2026-11-27 via overpass-api.de)
@@ -46,6 +61,6 @@ Bbox `34.0811,-118.2757,34.0847,-118.2714` (Overpass order), about 200 m around 
   N Reno St, N Vendome St, Reservoir St, Westerly Ter.
 
 ## TODO
-- [ ] Retry the primary endpoint, and record whether it's reachable from other networks.
+- [ ] Add the overpass.ch key to `.env`, test the interpreter and register the MCP server (local scope).
 - [ ] Save focus-area extracts as GeoJSON in `map/data/` (crossings, signals, curbs and sidewalks for "curb.here").
 - [ ] Look into curb-related tags: `kerb=*`, `sidewalk=*`, `parking:lane:*` / `parking:*`, `crossing=*`.
