@@ -1,10 +1,10 @@
-# Serves the GitHub Pages site (main:/docs) at https://curb.here/sunset/.
+# Serves the GitHub Pages site (main:/docs) at https://curb.here/.
 # Deploy: cd worker && npx wrangler deploy   (needs CLOUDFLARE_API_TOKEN in env, or `npx wrangler login`)
 name = "curb-here-sunset"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
 workers_dev = false
-routes = [{ pattern = "curb.here/sunset*", zone_name = "curb.here" }]
+routes = [{ pattern = "curb.here/*", zone_name = "curb.here" }]
 
 [vars]
 UPSTREAM = "https://here.github.io/curb.here"

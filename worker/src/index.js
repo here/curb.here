@@ -1,4 +1,4 @@
-// curb.here/sunset* -> GitHub Pages (here.github.io/curb.here/sunset*). See three/three.md.
+// curb.here/* -> GitHub Pages (here.github.io/curb.here/*). See three/three.md.
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);

@@ -34,7 +34,7 @@ docs/sunset/index.html + main.js   (three.js 0.170.0 from jsDelivr through an im
         │  GitHub Pages: branch main, folder /docs
         ▼
 https://here.github.io/curb.here/sunset/
-        │  Cloudflare Worker (wrangler), route curb.here/sunset*
+        │  Cloudflare Worker (wrangler), route curb.here/*
         ▼
 https://curb.here/sunset/
 ```
@@ -127,7 +127,7 @@ Each guess lives in **one table in the pipeline**, and every guessed value is fl
 Requirement: `curb.here` is a zone on the Cloudflare account, with DNS proxied (orange cloud).
 
 The Worker is in [`worker/wrangler.toml`](../worker/wrangler.toml) and [`worker/src/index.js`](../worker/src/index.js). It:
-- proxies `curb.here/sunset*` to `https://here.github.io/curb.here/sunset*`, for `GET`/`HEAD` only;
+- proxies `curb.here/*` to `https://here.github.io/curb.here/*`, for `GET`/`HEAD` only;
 - redirects `/sunset` to `/sunset/`, because the page's relative URLs need the trailing slash;
 - rewrites GitHub `Location` headers back onto curb.here;
 - caches at the edge for 5 minutes and strips GitHub/Fastly headers.
@@ -143,7 +143,7 @@ curl -I https://curb.here/sunset/
 ```
 
 - GitHub Pages sends `Cache-Control: max-age=600`. After a deploy, wait up to 10 minutes, or purge the Cloudflare cache.
-- Other paths on curb.here aren't touched by this route.
+- The route covers all of `curb.here`: `/` is `docs/index.html` and `/sunset/` is the viewer. Subdomains aren't covered.
 - No secrets are involved: the Worker only proxies public static files.
 
 ## Layout
