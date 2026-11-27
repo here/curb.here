@@ -33,19 +33,22 @@
 <div id="loading">Loading Sunset &amp; Silver Lake…</div>
 <div id="ui">
   <h1>Sunset &amp; Silver Lake</h1>
+  <button id="ui-toggle" aria-pressed="false" title="Show or hide the buttons">Show buttons</button>
+  <span id="controls" class="toggles" hidden>
   <button id="mode" aria-pressed="false" title="Toggle orbit / street view (V)">Street view</button>
   <select id="preset" aria-label="Jump to a spot">
     <option value="">Jump to…</option>
   </select>
   <span id="photo-toggles" class="toggles" hidden>
-    <label title="Each photo alone, flat, in front of where it was taken"><input type="checkbox" id="ph-flat"> Field photos flat</label>
-    <label title="Photos projected onto the model's surfaces; where they overlap, the first photo wins"><input type="checkbox" id="ph-mapped"> Field photos mapped</label>
+    <label title="Each photo alone, flat, in front of where it was taken"><input type="checkbox" id="ph-flat"> Photos flat</label>
+    <label title="Photos projected onto the model's surfaces; where they overlap, the first photo wins"><input type="checkbox" id="ph-mapped"> Photos mapped</label>
     <span id="photo-list" class="toggles" title="Turn individual photos on or off. Lower numbers take precedence where photos overlap."></span>
+  </span>
   </span>
   <span id="photo-time" class="pill" hidden></span>
 </div>
 <div id="help"></div>
 <div id="attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL · some sizes guessed<span id="photo-credit" hidden></span></div>
-<script type="module" src="./main.js?v=846bd44f66"></script>
+<script type="module" src="./main.js?v=01fcc8230c"></script>
 </body>
 </html>

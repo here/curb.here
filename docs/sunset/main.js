@@ -344,6 +344,9 @@ function label(text, x, z, cls, dy = 4) {
 
 // ---- controls ---------------------------------------------------------------------------
 let mode = "orbit";
+// Street view needs a keyboard to walk, so it's off on touchscreens (TODO in three/three.md).
+const TOUCH = matchMedia("(pointer: coarse)").matches;
+if (TOUCH) { $("mode").hidden = true; }
 const street = { x: 0, z: 0, yaw: 0, pitch: 0, vantage: null, jumpY: 0, vy: 0 }; // vantage: {eye, quat, fov} from a photo
 const FOV = 60;
 function leaveVantage(keepFov) {
@@ -356,12 +359,14 @@ function leaveVantage(keepFov) {
 const keys = new Set();
 
 function setMode(m, opts = {}) {
+  if (TOUCH && m === "street") m = "orbit";
   mode = m;
   orbit.enabled = m === "orbit";
   $("mode").setAttribute("aria-pressed", String(m === "street"));
   $("mode").textContent = m === "street" ? "Orbit view" : "Street view";
   $("help").textContent = m === "street"
     ? "Drag to look around · wheel zooms · W/S walk · A/D turn (hold Right Shift or / to strafe) · Left Shift = faster · Space to jump · double-click ground to go there · V for orbit"
+    : TOUCH ? "Drag to rotate · two-finger drag to pan · pinch to zoom"
     : "Drag to rotate · right-drag to pan · scroll to zoom · WASD / arrows to move · Q/E rotate · R/F tilt · +/− or PgUp/PgDn zoom (Left Shift = faster) · V for street view";
   if (m === "street") {
     if (opts.x === undefined) {
@@ -390,7 +395,7 @@ $("preset").onchange = (e) => {
 };
 addEventListener("keydown", (e) => {
   if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
-  if (e.key === "v" || e.key === "V") return setMode(mode === "orbit" ? "street" : "orbit");
+  if ((e.key === "v" || e.key === "V") && !TOUCH) return setMode(mode === "orbit" ? "street" : "orbit");
   if (e.code === "Space") {        // don't scroll or click a focused button
     e.preventDefault(); document.activeElement?.blur?.();
     if (mode === "street" && street.jumpY === 0) street.vy = JUMP_V;
@@ -494,7 +499,7 @@ function writeHash() {
   if (!hashDirty) return; hashDirty = false;
   const ph = (photoUI.flat.checked ? "f" : "") + (photoUI.mapped.checked ? "m" : "");
   const off = photos.map((P, i) => P.enabled ? "" : i + 1).filter(Boolean).join(",");
-  const extra = (ph ? `&ph=${ph}` : "") + (off ? `&poff=${off}` : "") + (street.vantage && mode === "street" ? `&at=${street.vantage.id}` : "");
+  const extra = `&ph=${ph}` + ($("controls").hidden ? "" : "&ui=1") + (off ? `&poff=${off}` : "") + (street.vantage && mode === "street" ? `&at=${street.vantage.id}` : "");
   const h = (mode === "street"
     ? `v=street&x=${f1(street.x)}&z=${f1(street.z)}&yaw=${f2(street.yaw)}&pitch=${f2(street.pitch)}`
     : `v=orbit&c=${camera.position.toArray().map(f1)}&t=${orbit.target.toArray().map(f1)}`) + extra;
@@ -502,16 +507,23 @@ function writeHash() {
 }
 setInterval(writeHash, 500);
 orbit.addEventListener("end", saveHash);
+function setControls(show) {
+  $("controls").hidden = !show;
+  $("ui-toggle").setAttribute("aria-pressed", String(show));
+  $("ui-toggle").textContent = show ? "Hide buttons" : "Show buttons";
+}
+$("ui-toggle").onclick = () => { setControls($("controls").hidden); saveHash(); };
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
-  const ph = q.get("ph") || "";
+  const ph = q.has("ph") ? q.get("ph") : "f";            // default: photos flat, not mapped
+  setControls(q.get("ui") === "1");
   photoUI.flat.checked = ph.includes("f"); photoUI.mapped.checked = ph.includes("m");
   const off = (q.get("poff") || "").split(",").map(Number);
   photos.forEach((P, i) => { P.enabled = !off.includes(i + 1); P.checkbox.checked = P.enabled; });
   applyPhotoToggles();
   const at = photos.find((p) => p.id === q.get("at"));
-  if (at) return goVantage(at);
-  if (q.get("v") === "street")
+  if (at && !TOUCH) return goVantage(at);
+  if (q.get("v") === "street" && !TOUCH)
     return setMode("street", { x: +q.get("x") || 0, z: +q.get("z") || 0, yaw: +q.get("yaw") || 0, pitch: +q.get("pitch") || 0 });
   const c = q.get("c")?.split(",").map(Number), t = q.get("t")?.split(",").map(Number);
   if (c?.length === 3 && t?.length === 3 && c.every(isFinite) && t.every(isFinite)) setMode("orbit", { pos: c, target: t });
@@ -687,6 +699,7 @@ function buildFlat(P) {
 }
 
 function goVantage(P) {
+  if (TOUCH) return;
   setMode("street", { x: P.p[0], z: P.p[1], vantage: { id: P.id, eye: P.h, quat: P.quat, fov: P.vfov } });
 }
 
@@ -759,6 +772,7 @@ async function setupPhotos() {
   for (const P of photos) {
     buildFlat(P);
     const label = `Photo vantage ${new Date(P.captured_at).toISOString().slice(0, 10)}`;
+    if (TOUCH) continue;                  // vantages are street-view poses
     presets.push({ name: label, photo: P });
     $("preset").add(new Option(label, presets.length - 1));
   }
